@@ -1,9 +1,11 @@
+import os
 from audible import log_helper
 import audible
 from httpx import Response
 import requests
 from pydub import AudioSegment
 import ffmpeg
+import subprocess as sp
 
 AUDIBLE_URL_BASE = "https://www.audible"
 
@@ -25,8 +27,9 @@ country_code_mapping = {
 
 # if not
 auth = audible.Authenticator.from_file("credentials.json")
-auth.get_activation_bytes("bytexs.txt",)
+auth.get_activation_bytes("activation_bytes.txt", True)
 
+breakpoint()
 # ATOMIC HABITS: 1473565421
 # THINK AGAIN: 0593394763
 
@@ -91,6 +94,8 @@ def convert_aax(aax_file):
     )
 
 
+os.system(
+    "ffmpeg -activation_bytes 8c2bf132 -i audiobooks/book.aax -c copy thinkagain.m4b")
 # GET BOOKMARKS
 bookmarks_url = f"https://cde-ta-g7g.amazon.com/FionaCDEServiceEngine/sidecar?type=AUDI&key={ASIN}"
 # bookmarks_dict = get_bookmarks(

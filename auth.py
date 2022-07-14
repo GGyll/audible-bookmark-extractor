@@ -1,11 +1,11 @@
 import audible
-import os
+
+from login_details import AUDIBLE_EMAIL, AUDIBLE_PASSWORD
 
 # Authorize and register in one step
 auth = audible.Authenticator.from_login(
-    os.environ.get("AUDIBLE_EMAIL"),
-    os.environ.get("AUDIBLE_PASSWORD"),
-
+    AUDIBLE_EMAIL,
+    AUDIBLE_PASSWORD,
     locale="uk",
     with_username=False
 )
