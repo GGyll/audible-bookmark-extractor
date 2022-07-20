@@ -1,5 +1,4 @@
 clips/
 ENV/
 audiobooks/
-login_details.py
-credentials.json
+sensitive/
