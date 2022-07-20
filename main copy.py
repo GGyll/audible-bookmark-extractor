@@ -25,11 +25,20 @@ country_code_mapping = {
     "es": ".es"
 }
 
-# if not
+# auth & activation_bytes
 auth = audible.Authenticator.from_file("credentials.json")
-auth.get_activation_bytes("activation_bytes.txt", True)
+if os.path.exists("activation_bytes.txt"):
+    with open('activation_bytes.txt') as f:
+        activation_bytes = f.readlines()[0]
+        print(activation_bytes)
+else:
+    activation_bytes = auth.get_activation_bytes(
+        "activation_bytes.txt", True)
+    text_file = open("activation_bytes.txt", "w")
+    n = text_file.write(activation_bytes)
+    text_file.close()
 
-breakpoint()
+
 # ATOMIC HABITS: 1473565421
 # THINK AGAIN: 0593394763
 
@@ -56,7 +65,6 @@ def get_download_url(url, **kwargs):
             url,
             **kwargs
         )
-        print(library)
         return library.url
 
 
@@ -66,8 +74,17 @@ def get(url, **kwargs):
             url,
             **kwargs
         )
-        print(library)
-        return library.url
+        return library
+
+
+def post(url, body, **kwargs):
+    with audible.Client(auth=auth) as client:
+        library = client.post(
+            url,
+            body,
+            **kwargs
+        )
+        return library
 
 
 def bookmark_response_callback(resp):
@@ -94,52 +111,61 @@ def convert_aax(aax_file):
     )
 
 
+my_body = {"asin": ASIN}
+resp = get(
+    f"{AUDIBLE_URL_BASE}{country_code_mapping.get(COUNTRY_CODE)}/1.0/library")
+breakpoint()
+# DOWNLOAD
+print(generate_url(COUNTRY_CODE, "download", ASIN))
+sample_url = ""
+re = get_download_url(generate_url(COUNTRY_CODE, "download", ASIN),
+                      num_results=1000, response_groups="product_desc, product_attrs")
+
+
+audible_response = requests.get(re)
+
+if audible_response.ok:
+    with open('fkowwkfo.aax', 'wb') as f:
+        f.write(audible_response.content)
+
+else:
+    print(audible_response.text)
+
+
 os.system(
-    "ffmpeg -activation_bytes 8c2bf132 -i audiobooks/book.aax -c copy thinkagain.m4b")
+    f"ffmpeg -activation_bytes {activation_bytes} -i audiobooks/book.aax -c copy {ASIN}.m4b")
+
+os.system(f"ffmpeg -i {ASIN}.m4b {ASIN}.wav")
+
+
 # GET BOOKMARKS
 bookmarks_url = f"https://cde-ta-g7g.amazon.com/FionaCDEServiceEngine/sidecar?type=AUDI&key={ASIN}"
-# bookmarks_dict = get_bookmarks(
-#     bookmarks_url, ASIN, num_results=1000, response_groups="product_desc, product_attrs")
+bookmarks_dict = get_bookmarks(
+    bookmarks_url, ASIN, num_results=1000, response_groups="product_desc, product_attrs")
 
-# li_bookmarks = bookmarks_dict.get("payload").get("records")
-# li_clips = sorted(li_bookmarks, key=lambda i: i["type"], reverse=True)
-# print(li_clips)
-# audio_book = AudioSegment.from_wav("file_name.wav")
+li_bookmarks = bookmarks_dict.get("payload").get("records")
+li_clips = sorted(li_bookmarks, key=lambda i: i["type"], reverse=True)
+print(li_clips)
+audio_book = AudioSegment.from_wav(f"{ASIN}.wav")
 
-# file_counter = 1
-# for audio_clip in li_clips:
-#     notes_dict = {}
-#     raw_start_pos = int(audio_clip["startPosition"])
-#     if audio_clip.get("type", None) in ["audible.note"]:
-#         notes_dict[raw_start_pos] = audio_clip.get("text")
+file_counter = 1
+notes_dict = {}
+for audio_clip in li_clips:
 
-#     if audio_clip.get("type", None) in ["audible.clip", "audible.bookmark"]:
+    raw_start_pos = int(audio_clip["startPosition"])
+    if audio_clip.get("type", None) in ["audible.note"]:
+        notes_dict[raw_start_pos] = audio_clip.get("text")
+        print(f"CLIP: {notes_dict[raw_start_pos]}  {raw_start_pos}")
+    if audio_clip.get("type", None) in ["audible.clip", "audible.bookmark"]:
+        start_pos = raw_start_pos - START_POSITION_OFFSET
+        end_pos = int(audio_clip.get(
+            "endPosition", raw_start_pos + 30000)) + END_POSITION_OFFSET
+        if start_pos == end_pos:
+            end_pos += 30000
 
-#         start_pos = raw_start_pos - START_POSITION_OFFSET
-#         end_pos = int(audio_clip.get(
-#             "endPosition", raw_start_pos + 30000)) + END_POSITION_OFFSET
-#         if start_pos == end_pos:
-#             end_pos += 30000
+        clip = audio_book[start_pos:end_pos]
 
-#         clip = audio_book[start_pos:end_pos]
+        file_name = notes_dict.get(raw_start_pos, f"clip{file_counter}")
 
-#         file_name = notes_dict.get(raw_start_pos, f"clip{file_counter}")
-
-#         clip.export(f"clips/atomichabits/{file_name}.flac", format="flac")
-#         file_counter += 1
-
-
-# DOWNLOAD
-# print(generate_url(COUNTRY_CODE, "download", ASIN))
-# sample_url = ""
-# re = get_download_url(generate_url(COUNTRY_CODE, "download", ASIN),
-#                       num_results=1000, response_groups="product_desc, product_attrs")
-
-# audible_response = requests.get(re)
-
-# if audible_response.ok:
-#     with open('fkowwkfo.aax', 'wb') as f:
-#         f.write(audible_response.content)
-
-# else:
-#     print(audible_response.text)
+        clip.export(f"clips/{ASIN}/{file_name}.flac", format="flac")
+        file_counter += 1
