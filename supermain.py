@@ -140,7 +140,7 @@ def get_download_url(url, **kwargs):
 
 if __name__ == "__main__":
     # authenticate with login
-    # don't stores any credentials on your system
+    # don't store any credentials on your system
     auth = audible.Authenticator.from_file("credentials.json")
 
     loop = asyncio.get_event_loop()
