@@ -260,7 +260,7 @@ class AudibleAPI:
 
         for book in self.books:
             if book is not None:
-                breakpoint()
+                # breakpoint()
                 print(book["item"]["title"])
                 asin = book["item"]["asin"]
                 raw_title = book["item"]["title"]
