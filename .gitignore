@@ -2,4 +2,4 @@ clips/
 ENV/
 audiobooks/
 sensitive/
-credentials.json()
+credentials.json

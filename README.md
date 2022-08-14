@@ -1,6 +1,12 @@
 \*\* This tool allows a user to download their audiobooks from Audible and transcribes their bookmarks into text, which can be exported to Notion and Excel (.csv)
 
-The main file which holds 90% of logic is supermain.py, this is where I am taking the existing logic from "main copy.py" and "transcribe.py" and developing a Command-line interface on top of it
+The main file which holds 90% of logic is main_file.py, this is where I am taking the existing logic from "main copy.py" and "transcribe.py" and developing a Command-line interface on top of it
+
+\*\* To start
+
+pip install -r requirements.txt
+
+Then run main_file.py
 
 \*\* On top of ffmpeg-pyton, you need FFMPEG installed on your computer, refer to python-ffmpeg github doc
 https://github.com/kkroening/ffmpeg-python
