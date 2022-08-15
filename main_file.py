@@ -461,8 +461,9 @@ class AudibleAPI:
                         
                         #Append heading and Transcription & Make a Dataframe to be later imported as CSV
                         pairs[str(heading)]=r.recognize_google(audio)
-                        xcel = pd.DataFrame(pairs.values(), index = pairs.keys(),columns=['Transcription'])
-                        xcel.rename(columns = {'Unnamed: 0':'Book Name'}, inplace = True)
+                        xcel = pd.DataFrame.from_dict(pairs, orient='index')
+                        xcel.index.name = 'Book Name'
+                        xcel.rename(columns={0:'Transcription'}, inplace= True)
                         xcel.to_csv(str(os.getcwd()+"/Trancribed_bookmarks/"+title)+".csv")
 
                     # TODO Julian
