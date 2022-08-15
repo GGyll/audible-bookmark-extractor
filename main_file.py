@@ -1,9 +1,11 @@
 import os
 import sys
 import asyncio
+import textwrap
 import pandas as pd
 import audible
 import requests
+from xlsxwriter import workbook, worksheet
 from pydub import AudioSegment
 
 import speech_recognition as sr
@@ -460,11 +462,48 @@ class AudibleAPI:
                         audio = r.record(source)  
                         
                         #Append heading and Transcription & Make a Dataframe to be later imported as CSV
+                        #pairs[str(heading)]=r.recognize_google(audio)
+                        #xcel = pd.DataFrame.from_dict(pairs, orient='index')
+                        #xcel.index.name = 'Book Name'
+                        #xcel.rename(columns={0:'Transcription'}, inplace= True)
+                        #xcel.to_csv(str(os.getcwd()+"/Trancribed_bookmarks/"+title)+".csv")
+                        
+                        #Append heading and transcription for the xslx option
                         pairs[str(heading)]=r.recognize_google(audio)
                         xcel = pd.DataFrame.from_dict(pairs, orient='index')
                         xcel.index.name = 'Book Name'
                         xcel.rename(columns={0:'Transcription'}, inplace= True)
-                        xcel.to_csv(str(os.getcwd()+"/Trancribed_bookmarks/"+title)+".csv")
+                
+                #Create writer instance with desired path 
+                writer = pd.ExcelWriter(f"{os.getcwd()}/Trancribed_bookmarks/{title}.xlsx", engine = 'xlsxwriter')
+                #Create a sheet in the same workbook for each file in the directory
+                xcel.to_excel(writer, sheet_name=title)
+                workbook = writer.book
+                worksheet = writer.sheets[title]
+                #Create header format to be used in all headers
+                header_format = workbook.add_format({
+                    "valign":"vcenter",
+                    "align":"center",
+                    "bg_color":"#FFA500",
+                    "bold": True,
+                    "font_color":"#FFFFFF"})
+                
+                #Apply header format and format columns to fit data
+                worksheet.write(0,0,'Clip Note',header_format)
+                worksheet.write(0,1,'Transcription', header_format)
+                worksheet.set_column("B:B",100)
+                worksheet.set_column("A:A",30)
+                cell_format = workbook.add_format({'text_wrap':True})
+                
+                #Format cells for appropiate size and wrap the text for style points
+                for i in range(1,(len(xcel)+1)):
+                    worksheet.set_row(i,100, cell_format)
+                
+                #Apply changes and save xlsx to Transcribed bookmarks folder.
+                writer.save()
+
+
+
 
                     # TODO Julian
                     # Heading is the name of the bookmark
