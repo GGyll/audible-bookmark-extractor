@@ -372,7 +372,7 @@ class AudibleAPI:
             # print(li_clips)
 
             # Load audiobook into AudioSegment so we can slice it
-            audio_book = AudioSegment.from_wav(f"/Users/julianlagier/Desktop/python projects/audible-bookmark-extractor/audiobooks/1473565421.wav")
+            audio_book = AudioSegment.from_wav(f"{os.getcwd()}/audiobooks/{asin}.wav")
 
             file_counter = 1
             notes_dict = {}
@@ -407,7 +407,7 @@ class AudibleAPI:
 
                     # Save the clip
                     clip.export(
-                       f"/Users/julianlagier/Desktop/python projects/audible-bookmark-extractor/clips/{title}/{file_name}.flac", format="flac")
+                       f"{os.getcwd()}/clips/{title}/{file_name}.flac", format="flac")
                     file_counter += 1
 
     async def cmd_convert_audiobook(self):
@@ -434,6 +434,7 @@ class AudibleAPI:
         li_books = await self.get_book_selection()
 
         r = sr.Recognizer()
+        
         #Create dictionary to store titles and transcriptions and new folder to store transcriptions
         pairs = {}
         
