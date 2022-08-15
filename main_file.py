@@ -1,7 +1,7 @@
 import os
 import sys
 import asyncio
-
+import pandas as pd
 import audible
 import requests
 from pydub import AudioSegment
@@ -196,6 +196,10 @@ class AudibleAPI:
 
                     audible_response = requests.get(re, stream=True)
 
+                    path_exists = os.path.exists(f"audiobooks/{title}")
+                    if not path_exists:
+                        os.makedirs(f"audiobooks/{title}")
+
                     if audible_response.ok:
                         with open(f'audiobooks/{title}.aax', 'wb') as f:
                             print("Downloading %s" % raw_title)
@@ -368,7 +372,7 @@ class AudibleAPI:
             # print(li_clips)
 
             # Load audiobook into AudioSegment so we can slice it
-            audio_book = AudioSegment.from_wav(f"{asin}.wav")
+            audio_book = AudioSegment.from_wav(f"/Users/julianlagier/Desktop/python projects/audible-bookmark-extractor/audiobooks/1473565421.wav")
 
             file_counter = 1
             notes_dict = {}
@@ -403,7 +407,7 @@ class AudibleAPI:
 
                     # Save the clip
                     clip.export(
-                        f"clips/{title}/{file_name}.flac", format="flac")
+                       f"/Users/julianlagier/Desktop/python projects/audible-bookmark-extractor/clips/{title}/{file_name}.flac", format="flac")
                     file_counter += 1
 
     async def cmd_convert_audiobook(self):
@@ -430,7 +434,14 @@ class AudibleAPI:
         li_books = await self.get_book_selection()
 
         r = sr.Recognizer()
-
+        #Create dictionary to store titles and transcriptions and new folder to store transcriptions
+        pairs = {}
+        
+        #Re check if path exists if not create one 
+        path_exists = os.path.exists(os.getcwd()+"/Trancribed_bookmarks")
+        if not path_exists:
+            os.mkdir(str(os.getcwd())+"/Trancribed_bookmarks")
+        
         for book in li_books:
             _title = book.get("title", {}).get("title", {})
             title = _title.lower().replace(" ", "_")
@@ -445,7 +456,13 @@ class AudibleAPI:
                     audioclip = sr.AudioFile(os.path.join(
                         os.fsdecode(directory), filename))
                     with audioclip as source:
-                        audio = r.record(source)
+                        audio = r.record(source)  
+                        
+                        #Append heading and Transcription & Make a Dataframe to be later imported as CSV
+                        pairs[str(heading)]=r.recognize_google(audio)
+                        xcel = pd.DataFrame(pairs.values(), index = pairs.keys(),columns=['Transcription'])
+                        xcel.rename(columns = {'Unnamed: 0':'Book Name'}, inplace = True)
+                        xcel.to_csv(str(os.getcwd()+"/Trancribed_bookmarks/"+title)+".csv")
 
                     # TODO Julian
                     # Heading is the name of the bookmark
@@ -453,13 +470,12 @@ class AudibleAPI:
                     # Have fun :)))
 
                     # print(heading)
-                    # print(r.recognize_google(audio))
+                    #print(r.recognize_google(audio))
 
                     # Disabled as currently only working with my API key
                     # post_notion(heading, r.recognize_google(audio))
-
-                else:
-                    continue
+            else:
+                continue 
 
     def get_activation_bytes(self):
 
