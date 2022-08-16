@@ -487,24 +487,26 @@ class AudibleAPI:
                     "bg_color":"#FFA500",
                     "bold": True,
                     "font_color":"#FFFFFF"})
-                
+
+                #Set desired cell format 
+                cell_format = workbook.add_format()
+                cell_format.set_align("vcenter")
+                cell_format.set_align("center")
+                cell_format.set_text_wrap(True)
+
                 #Apply header format and format columns to fit data
                 worksheet.write(0,0,'Clip Note',header_format)
                 worksheet.write(0,1,'Transcription', header_format)
                 worksheet.set_column("B:B",100)
-                worksheet.set_column("A:A",30)
-                cell_format = workbook.add_format({'text_wrap':True})
+                worksheet.set_column("A:A",50)     
                 
-                #Format cells for appropiate size and wrap the text for style points
+                #Format cells for appropiate size, wrap the text for style points
                 for i in range(1,(len(xcel)+1)):
                     worksheet.set_row(i,100, cell_format)
                 
                 #Apply changes and save xlsx to Transcribed bookmarks folder.
                 writer.save()
-
-
-
-
+                    
                     # TODO Julian
                     # Heading is the name of the bookmark
                     # r.recognize_google(audio) is the transcribed text
