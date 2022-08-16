@@ -3,6 +3,7 @@ import sys
 import asyncio
 import textwrap
 import pandas as pd
+import pandas.io.formats.excel
 import audible
 import requests
 from xlsxwriter import workbook, worksheet
@@ -470,23 +471,27 @@ class AudibleAPI:
                         
                         #Append heading and transcription for the xslx option
                         pairs[str(heading)]=r.recognize_google(audio)
-                        xcel = pd.DataFrame.from_dict(pairs, orient='index')
-                        xcel.index.name = 'Book Name'
-                        xcel.rename(columns={0:'Transcription'}, inplace= True)
+                        xcel = pd.DataFrame(pairs.values(), index = pairs.keys())
+                
+                #Change header format so that rows can be edited
+                pandas.io.formats.excel.ExcelFormatter.header_style = None
                 
                 #Create writer instance with desired path 
-                writer = pd.ExcelWriter(f"{os.getcwd()}/Trancribed_bookmarks/{title}.xlsx", engine = 'xlsxwriter')
+                writer = pd.ExcelWriter(f"{os.getcwd()}/Trancribed_bookmarks/All.xlsx", engine = 'xlsxwriter')
+                
                 #Create a sheet in the same workbook for each file in the directory
                 xcel.to_excel(writer, sheet_name=title)
                 workbook = writer.book
                 worksheet = writer.sheets[title]
+                
                 #Create header format to be used in all headers
                 header_format = workbook.add_format({
                     "valign":"vcenter",
                     "align":"center",
                     "bg_color":"#FFA500",
                     "bold": True,
-                    "font_color":"#FFFFFF"})
+                    "font_color":"#FFFFFF"}) #transcribe_bookmarks
+
 
                 #Set desired cell format 
                 cell_format = workbook.add_format()
