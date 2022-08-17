@@ -38,13 +38,10 @@ END_POSITION_OFFSET = 0
 
 help_dict = {
     "download_books": "Downloads books and saves them locally",
-    "get_bookmarks": "WIP, extracts all timestamps for bookmarks in the selected audiobook",
     "convert_audiobook": "Removes Audible DRM from the selected audiobooks and converts them to .wav so they can be sliced",
+    "get_bookmarks": "WIP, extracts all timestamps for bookmarks in the selected audiobook",
     "list_books": "Lists the users books",
-    "show_library": "Probably does the same thing as above",
-    "get_bookmarks": "Can only be run after audiobook has been converted. Gets the bookmarks and slices them into audiclips",
     "transcribe_bookmarks": "Self-explanatory, connects to Google Speech Recognition API and outputs the result"
-
 }
 
 # Errors from Audible's API creates one of these, so we can understand them properly
@@ -199,12 +196,12 @@ class AudibleAPI:
 
                     audible_response = requests.get(re, stream=True)
 
-                    path_exists = os.path.exists(f"audiobooks/{title}")
+                    path_exists = os.path.exists(f"audiobooks/{title}/")
                     if not path_exists:
-                        os.makedirs(f"audiobooks/{title}")
+                        os.makedirs(f"audiobooks/{title}/")
 
                     if audible_response.ok:
-                        with open(f'audiobooks/{title}.aax', 'wb') as f:
+                        with open(f'audiobooks/{title}/{title}.aax', 'wb') as f:
                             print("Downloading %s" % raw_title)
 
                             total_length = audible_response.headers.get(
@@ -218,7 +215,7 @@ class AudibleAPI:
                                 # Save book locally and calculate and print download progress (progress bar)
                                 dl = 0
                                 total_length = int(total_length)
-                                for data in audible_response.iter_content(chunk_size=4096):
+                                for data in audible_response.iter_content(chunk_size=1024*1024):
                                     dl += len(data)
                                     f.write(data)
                                     done = int(50 * dl / total_length)
@@ -375,7 +372,7 @@ class AudibleAPI:
             # print(li_clips)
 
             # Load audiobook into AudioSegment so we can slice it
-            audio_book = AudioSegment.from_wav(f"{os.getcwd()}/audiobooks/{asin}.wav")
+            audio_book = AudioSegment.from_wav(f"{os.getcwd()}/audiobooks/{title}/{asin}.wav")
 
             file_counter = 1
             notes_dict = {}
@@ -428,10 +425,10 @@ class AudibleAPI:
             # Strips Audible DRM  from audiobook
             activation_bytes = self.get_activation_bytes()
             os.system(
-                f"ffmpeg -activation_bytes {activation_bytes} -i audiobooks/{title}.aax -c copy audiobooks/{asin}.m4b")
+                f"ffmpeg -activation_bytes {activation_bytes} -i audiobooks/{title}/{title}.aax -c copy audiobooks/{title}/{asin}.m4b")
 
             # Converts audiobook to .wav
-            os.system(f"ffmpeg -i audiobooks/{asin}.m4b audiobooks/{asin}.wav")
+            os.system(f"ffmpeg -i audiobooks/{title}/{asin}.m4b audiobooks/{title}/{asin}.wav")
 
     async def cmd_transcribe_bookmarks(self):
         li_books = await self.get_book_selection()
@@ -462,6 +459,7 @@ class AudibleAPI:
                     with audioclip as source:
                         audio = r.record(source)  
                         
+                    #This commented out part is the CSV Exporter  
                         #Append heading and Transcription & Make a Dataframe to be later imported as CSV
                         #pairs[str(heading)]=r.recognize_google(audio)
                         #xcel = pd.DataFrame.from_dict(pairs, orient='index')
@@ -473,11 +471,13 @@ class AudibleAPI:
                         pairs[str(heading)]=r.recognize_google(audio)
                         xcel = pd.DataFrame(pairs.values(), index = pairs.keys())
                 
+                #This part is the xlsx importer
+
                 #Change header format so that rows can be edited
                 pandas.io.formats.excel.ExcelFormatter.header_style = None
                 
                 #Create writer instance with desired path 
-                writer = pd.ExcelWriter(f"{os.getcwd()}/Trancribed_bookmarks/All.xlsx", engine = 'xlsxwriter')
+                writer = pd.ExcelWriter(f"{os.getcwd()}/Trancribed_bookmarks/All_Transcriptions.xlsx", engine = 'xlsxwriter')
                 
                 #Create a sheet in the same workbook for each file in the directory
                 xcel.to_excel(writer, sheet_name=title)
