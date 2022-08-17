@@ -1,9 +1,12 @@
 import os
 import sys
 import asyncio
-
+import textwrap
+import pandas as pd
+import pandas.io.formats.excel
 import audible
 import requests
+from xlsxwriter import workbook, worksheet
 from pydub import AudioSegment
 
 import speech_recognition as sr
@@ -35,13 +38,10 @@ END_POSITION_OFFSET = 0
 
 help_dict = {
     "download_books": "Downloads books and saves them locally",
-    "get_bookmarks": "WIP, extracts all timestamps for bookmarks in the selected audiobook",
     "convert_audiobook": "Removes Audible DRM from the selected audiobooks and converts them to .wav so they can be sliced",
+    "get_bookmarks": "WIP, extracts all timestamps for bookmarks in the selected audiobook",
     "list_books": "Lists the users books",
-    "show_library": "Probably does the same thing as above",
-    "get_bookmarks": "Can only be run after audiobook has been converted. Gets the bookmarks and slices them into audiclips",
     "transcribe_bookmarks": "Self-explanatory, connects to Google Speech Recognition API and outputs the result"
-
 }
 
 # Errors from Audible's API creates one of these, so we can understand them properly
@@ -196,8 +196,12 @@ class AudibleAPI:
 
                     audible_response = requests.get(re, stream=True)
 
+                    path_exists = os.path.exists(f"audiobooks/{title}/")
+                    if not path_exists:
+                        os.makedirs(f"audiobooks/{title}/")
+
                     if audible_response.ok:
-                        with open(f'audiobooks/{title}.aax', 'wb') as f:
+                        with open(f'audiobooks/{title}/{title}.aax', 'wb') as f:
                             print("Downloading %s" % raw_title)
 
                             total_length = audible_response.headers.get(
@@ -211,7 +215,7 @@ class AudibleAPI:
                                 # Save book locally and calculate and print download progress (progress bar)
                                 dl = 0
                                 total_length = int(total_length)
-                                for data in audible_response.iter_content(chunk_size=4096):
+                                for data in audible_response.iter_content(chunk_size=1024*1024):
                                     dl += len(data)
                                     f.write(data)
                                     done = int(50 * dl / total_length)
@@ -368,7 +372,7 @@ class AudibleAPI:
             # print(li_clips)
 
             # Load audiobook into AudioSegment so we can slice it
-            audio_book = AudioSegment.from_wav(f"{asin}.wav")
+            audio_book = AudioSegment.from_wav(f"{os.getcwd()}/audiobooks/{title}/{asin}.wav")
 
             file_counter = 1
             notes_dict = {}
@@ -403,7 +407,7 @@ class AudibleAPI:
 
                     # Save the clip
                     clip.export(
-                        f"clips/{title}/{file_name}.flac", format="flac")
+                       f"{os.getcwd()}/clips/{title}/{file_name}.flac", format="flac")
                     file_counter += 1
 
     async def cmd_convert_audiobook(self):
@@ -421,16 +425,24 @@ class AudibleAPI:
             # Strips Audible DRM  from audiobook
             activation_bytes = self.get_activation_bytes()
             os.system(
-                f"ffmpeg -activation_bytes {activation_bytes} -i audiobooks/{title}.aax -c copy audiobooks/{asin}.m4b")
+                f"ffmpeg -activation_bytes {activation_bytes} -i audiobooks/{title}/{title}.aax -c copy audiobooks/{title}/{asin}.m4b")
 
             # Converts audiobook to .wav
-            os.system(f"ffmpeg -i audiobooks/{asin}.m4b audiobooks/{asin}.wav")
+            os.system(f"ffmpeg -i audiobooks/{title}/{asin}.m4b audiobooks/{title}/{asin}.wav")
 
     async def cmd_transcribe_bookmarks(self):
         li_books = await self.get_book_selection()
 
         r = sr.Recognizer()
-
+        
+        #Create dictionary to store titles and transcriptions and new folder to store transcriptions
+        pairs = {}
+        
+        #Re check if path exists if not create one 
+        path_exists = os.path.exists(os.getcwd()+"/Trancribed_bookmarks")
+        if not path_exists:
+            os.mkdir(str(os.getcwd())+"/Trancribed_bookmarks")
+        
         for book in li_books:
             _title = book.get("title", {}).get("title", {})
             title = _title.lower().replace(" ", "_")
@@ -445,21 +457,73 @@ class AudibleAPI:
                     audioclip = sr.AudioFile(os.path.join(
                         os.fsdecode(directory), filename))
                     with audioclip as source:
-                        audio = r.record(source)
+                        audio = r.record(source)  
+                        
+                    #This commented out part is the CSV Exporter  
+                        #Append heading and Transcription & Make a Dataframe to be later imported as CSV
+                        #pairs[str(heading)]=r.recognize_google(audio)
+                        #xcel = pd.DataFrame.from_dict(pairs, orient='index')
+                        #xcel.index.name = 'Book Name'
+                        #xcel.rename(columns={0:'Transcription'}, inplace= True)
+                        #xcel.to_csv(str(os.getcwd()+"/Trancribed_bookmarks/"+title)+".csv")
+                        
+                        #Append heading and transcription for the xslx option
+                        pairs[str(heading)]=r.recognize_google(audio)
+                        xcel = pd.DataFrame(pairs.values(), index = pairs.keys())
+                
+                #This part is the xlsx importer
 
+                #Change header format so that rows can be edited
+                pandas.io.formats.excel.ExcelFormatter.header_style = None
+                
+                #Create writer instance with desired path 
+                writer = pd.ExcelWriter(f"{os.getcwd()}/Trancribed_bookmarks/All_Transcriptions.xlsx", engine = 'xlsxwriter')
+                
+                #Create a sheet in the same workbook for each file in the directory
+                xcel.to_excel(writer, sheet_name=title)
+                workbook = writer.book
+                worksheet = writer.sheets[title]
+                
+                #Create header format to be used in all headers
+                header_format = workbook.add_format({
+                    "valign":"vcenter",
+                    "align":"center",
+                    "bg_color":"#FFA500",
+                    "bold": True,
+                    "font_color":"#FFFFFF"}) #transcribe_bookmarks
+
+
+                #Set desired cell format 
+                cell_format = workbook.add_format()
+                cell_format.set_align("vcenter")
+                cell_format.set_align("center")
+                cell_format.set_text_wrap(True)
+
+                #Apply header format and format columns to fit data
+                worksheet.write(0,0,'Clip Note',header_format)
+                worksheet.write(0,1,'Transcription', header_format)
+                worksheet.set_column("B:B",100)
+                worksheet.set_column("A:A",50)     
+                
+                #Format cells for appropiate size, wrap the text for style points
+                for i in range(1,(len(xcel)+1)):
+                    worksheet.set_row(i,100, cell_format)
+                
+                #Apply changes and save xlsx to Transcribed bookmarks folder.
+                writer.save()
+                    
                     # TODO Julian
                     # Heading is the name of the bookmark
                     # r.recognize_google(audio) is the transcribed text
                     # Have fun :)))
 
                     # print(heading)
-                    # print(r.recognize_google(audio))
+                    #print(r.recognize_google(audio))
 
                     # Disabled as currently only working with my API key
                     # post_notion(heading, r.recognize_google(audio))
-
-                else:
-                    continue
+            else:
+                continue 
 
     def get_activation_bytes(self):
 
