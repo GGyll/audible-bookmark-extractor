@@ -210,7 +210,7 @@ class AudibleAPI:
                 print(book["item"]["title"])
                 asin = book["item"]["asin"]
                 raw_title = book["item"]["title"]
-                title = raw_title.replace(" ", "_")
+                title = raw_title.lower().replace(" ", "_")
                 all_books[asin] = title
 
                 # Attempt to download book
