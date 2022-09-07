@@ -20,3 +20,6 @@ This message is borrowed from the https://apprenticealf.wordpress.com/ page.
 
 Icon attributed to:
 https://www.flaticon.com/free-icons/bass"
+
+
+The purpose of this software is not to circumvent the DRM restrictions for audio books that you do not own in that you do not have them on your personal Audible account. The purpose of this software is to create a method for you to download and store your books just in case Audible fails for some reason.
