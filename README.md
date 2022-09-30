@@ -23,3 +23,11 @@ https://www.flaticon.com/free-icons/bass"
 
 
 The purpose of this software is not to circumvent the DRM restrictions for audio books that you do not own in that you do not have them on your personal Audible account. The purpose of this software is to create a method for you to download and store your books just in case Audible fails for some reason.
+FAQ:
+
+sh: 1: ffmpeg: not found
+You need to install ffmpeg
+
+Add path exists check to activation bytes
+
+Clean up file name and directories so they maych

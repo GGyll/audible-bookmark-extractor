@@ -6,9 +6,6 @@ from getpass import getpass
 
 import pandas as pd
 import pandas.io.formats.excel
-
-import httpx
-
 import audible
 
 from pydub import AudioSegment
@@ -30,7 +27,6 @@ country_code_mapping = {
 }
 
 AUDIBLE_URL_BASE = "https://www.audible"
-COUNTRY_CODE = "uk"
 
 # set in ms, how long before and after the bookmark timestamp we want to slice the audioclips, useful for redundancy
 # i.e to account for the time the user spends to dig up their phone and click bookmark
@@ -42,7 +38,7 @@ help_dict = {
     "authenticate": "Logs in to Audible and stores credentials locally to be re-used",
     "list_books": "Lists the users books",
     "download_books": "Downloads books and saves them locally",
-    "convert_audiobook": "Removes Audible DRM from the selected audiobooks and converts them to .wav so they can be sliced",
+    "convert_audiobook": "Removes Audible DRM from the selected audiobooks and converts them to .mp3 so they can be sliced",
     "get_bookmarks": "WIP, extracts all timestamps for bookmarks in the selected audiobook",
     "transcribe_bookmarks": "Self-explanatory, connects to Speech Recognition API and outputs the result"
 }
@@ -74,10 +70,14 @@ class AudibleAPI:
     # CLI loaded for first time
     async def welcome(self):
         print("Audible Bookmark Extractor v1.0")
+        print("Enter CTRL + C to exit")
         print("To download your audiobooks, ensure you are authenticated, then enter download_books")
         print("Enter help for a list of commands")
 
     async def cmd_authenticate(self):
+        if os.path.exists("credentials.json"):
+            print("You are already authenticated, to switch accounts, delete credentials.json and try again")
+            await self.main()
         email = input("Audible Email: ")
         password = getpass(
             "Enter Password (will be hidden, press ENTER when done): ")
@@ -93,6 +93,7 @@ class AudibleAPI:
         auth.to_file("credentials.json")
         print("Credentials saved locally successfully")
         self.auth = auth
+
         await self.main()
 
     # Gets information about a book
@@ -121,12 +122,12 @@ class AudibleAPI:
     async def main(self):
         if not self.auth:
             print(
-                "No Audible credentials found, please run 'authenticate' to generate them")
+                "\nNo Audible credentials found, please run 'authenticate' to generate them")
         await self.enter_command()
 
     # Takes a command and splits it to see if any additional kwargs were supplied i.e --asin="B04EFJIFJI"
     async def enter_command(self):
-        command_input = input("\nEnter command: ")
+        command_input = input("\n\nEnter command: ")
         command = command_input.split(" ")[0]
         additional_kwargs = command_input.replace(command, '')
         _kwargs = {}
@@ -150,15 +151,15 @@ class AudibleAPI:
     # Callbacks
     async def invalid_command_callback(self):
         print("Invalid command, try again")
-        await self.enter_command()
+        await self.main()
 
     async def invalid_kwarg_callback(self):
         print("Invalid command or arguments supplied, try again")
-        await self.enter_command()
+        await self.main()
 
     async def invalid_auth_callback(self):
         print("Invalid Audible credentials, run authenticate and try again")
-        await self.enter_command()
+        await self.main()
 
     # Helper function for displaying the users books and allowing them to select one based on the index number
 
@@ -215,8 +216,7 @@ class AudibleAPI:
 
                 # Attempt to download book
                 try:
-                    re = self.get_download_url(self.generate_url(
-                        COUNTRY_CODE, "download", asin), num_results=1000, response_groups="product_desc, product_attrs")
+                    re = self.get_download_url(self.generate_url(self.auth.locale.country_code, "download", asin), num_results=1000, response_groups="product_desc, product_attrs")
 
                 # Audible API throws error, usually for free books that are not allowed to be downloaded, we skip to the next
                 except audible.exceptions.NetworkError as e:
@@ -249,11 +249,9 @@ class AudibleAPI:
                                 dl += len(data)
                                 f.write(data)
                                 done = int(50 * dl / total_length)
-                                sys.stdout.write("\r[%s%s]" % (
-                                    '=' * done, ' ' * (50-done)))
+                                sys.stdout.write("\r[%s%s]" % ('=' * done, ' ' * (50-done)))
 
-                                sys.stdout.write(
-                                    f"   {int(dl / total_length * 100)}%")
+                                sys.stdout.write(f"   {int(dl / total_length * 100)}%")
                                 sys.stdout.flush()
                             await self.main()
 
@@ -264,7 +262,7 @@ class AudibleAPI:
     # WIP
     def generate_url(self, country_code, url_type, asin=None):
         if asin and url_type == "download":
-            return f"{AUDIBLE_URL_BASE}{country_code_mapping.get(country_code)}/library/download?asin={asin}&codec=AAX_44_128"
+            return f"{AUDIBLE_URL_BASE}{country_code_mapping.get(country_code)}/library/download?asin={asin}&codec=AAX"
 
     # Need the next_request for Audible API to give us the download link for the book
     def get_download_link_callback(self, resp):
@@ -291,7 +289,7 @@ class AudibleAPI:
     async def cmd_help(self):
         for key in help_dict:
             print(f"{key} -- {help_dict[key]}")
-        # print(help_dict)
+        print("Enter CTRL + C to exit the program")
         await self.main()
 
     # Gets all books and info for account and adds it to self.books, also returns ASIN for all books
@@ -405,8 +403,8 @@ class AudibleAPI:
 
             # Load audiobook into AudioSegment so we can slice it
             audio_book = AudioSegment.from_wav(
-                f"{os.getcwd()}/audiobooks/{title}/{asin}.wav")
-
+                f"{os.getcwd()}/audiobooks/{title}/{title}.wav")
+            
             file_counter = 1
             notes_dict = {}
 
@@ -454,15 +452,15 @@ class AudibleAPI:
             if not _title:
                 return
 
-            title = _title.replace(" ", "_")
+            title = _title.replace(" ", "_").lower()
             # Strips Audible DRM  from audiobook
             activation_bytes = self.get_activation_bytes()
             os.system(
-                f"ffmpeg -activation_bytes {activation_bytes} -i audiobooks/{title}/{title}.aax -c copy audiobooks/{title}/{asin}.m4b")
+                f"ffmpeg -activation_bytes {activation_bytes} -i audiobooks/{title}/{title}.aax -c copy audiobooks/{title}/{title}.m4b")
 
-            # Converts audiobook to .wav
+            # Converts audiobook to .mp3
             os.system(
-                f"ffmpeg -i audiobooks/{title}/{asin}.m4b audiobooks/{title}/{asin}.wav")
+                f"ffmpeg -i audiobooks/{title}/{title}.m4b audiobooks/{title}/{title}.mp3")
 
             await self.main()
 
@@ -548,8 +546,53 @@ class AudibleAPI:
                     # Apply changes and save xlsx to Transcribed bookmarks folder.
                     writer.save()
 
-                    # Disabled as currently only working with my API key
-                    post_notion(heading, r.recognize_google(audio))
+                    # post_notion(heading, r.recognize_google(audio))
+
+        async def cmd_authenticate_notion(self):
+            pass
+
+        async def post_notion(self, text_heading, text_content):
+            if not self.notion_token:
+                # Prompt user to authenticate and provide their notion_token before continuing
+                print("")
+            url = "https://api.notion.com/v1/pages"
+
+            data = {
+                "parent": {"database_id": "1b9cbc3855e942e6b6ecf9bc0bde3a49"},
+                "properties": {
+                    "Heading": {
+                        "title": [
+                            {
+                                "text": {
+                                    "content": text_heading
+                                }
+                            }
+                        ]
+                    },
+                    "Content": {
+                        "rich_text": [
+                            {
+                                "text": {
+                                    "content": text_content
+                                }
+                            }
+                        ]
+                    }
+                }}
+            import json
+            data = json.dumps(data)
+
+            headers = {
+                "Authorization": f"Bearer {self.notion_token}",
+                "Accept": "application/json",
+                "Notion-Version": "2022-02-22",
+                "Content-Type": "application/json"
+            }
+
+            response = requests.post(url, headers=headers, data=data)
+
+            print(response.text)
+
 
     def get_activation_bytes(self):
 
