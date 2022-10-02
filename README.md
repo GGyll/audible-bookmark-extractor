@@ -8,7 +8,7 @@ pip install -r requirements.txt
 
 Then run main_file.py
 
-\*\* On top of ffmpeg-pyton, you need FFMPEG installed on your computer, refer to python-ffmpeg github doc
+\*\* On top of ffmpeg-python, you need FFMPEG installed on your computer, refer to python-ffmpeg github doc
 https://github.com/kkroening/ffmpeg-python
 
 \*\*Anti-Piracy Notice
