@@ -46,8 +46,6 @@ help_dict = {
 AUTHLESS_COMMANDS = ["help", "authenticate"]
 
 # Used to display errors from Audible's API
-
-
 class ExternalError:
 
     def __init__(self, initiator, asin, error):
@@ -97,7 +95,6 @@ class AudibleAPI:
         await self.main()
 
     # Gets information about a book
-
     async def get_book_infos(self, asin):
         async with audible.AsyncClient(self.auth) as client:
             try:
@@ -162,7 +159,6 @@ class AudibleAPI:
         await self.main()
 
     # Helper function for displaying the users books and allowing them to select one based on the index number
-
     async def get_book_selection(self):
 
         if not self.library:
