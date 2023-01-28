@@ -8,8 +8,12 @@ pip install -r requirements.txt
 
 Then run main_file.py
 
+Type help for a list of useful commands
+
 ### On top of ffmpeg-python, you need FFMPEG installed on your computer, refer to python-ffmpeg github doc
 https://github.com/kkroening/ffmpeg-python
+
+
 
 ### Anti-Piracy Notice
 Note that this project does NOT 'crack' Audible DRM or download audiobooks which the user does not own. It simplys allows the user to use their own encryption key (fetched from Audible servers) to decrypt the audiobook in the same manner that the official audiobook playing software does, and download audiobooks which they have purchased.
