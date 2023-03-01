@@ -4,14 +4,18 @@ main_file.py contains the CLI and most of the application login
 
 ### To start
 
+```
 pip install -r requirements.txt
-
-Then run main_file.py
+```
+After everything is installed:
+´´´
+python main_file.py
+´´´
 
 Type help for a list of useful commands
 
 ### Authentication
-run command 
+Run command 
 ```
 authenticate
 ```
