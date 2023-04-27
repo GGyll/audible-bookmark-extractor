@@ -1,6 +1,6 @@
 ## This tool allows a user to download their audiobooks from Audible and transcribes their bookmarks into text, which can be exported to Notion and Excel (.csv)
 
-main_file.py contains the CLI and most of the application login
+main_file.py contains the CLI and most of the application logic
 
 ### To start
 
