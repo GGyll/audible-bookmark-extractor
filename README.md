@@ -8,9 +8,10 @@ main_file.py contains the CLI and most of the application logic
 pip install -r requirements.txt
 ```
 After everything is installed:
-´´´
+
+```
 python main_file.py
-´´´
+```
 
 Type help for a list of useful commands
 
