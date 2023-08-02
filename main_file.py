@@ -398,9 +398,9 @@ class AudibleAPI:
                 li_bookmarks, key=lambda i: i["type"], reverse=True)
 
             # Load audiobook into AudioSegment so we can slice it
-            audio_book = AudioSegment.from_wav(
-                f"{os.getcwd()}/audiobooks/{title}/{title}.wav")
-            
+            audio_book = AudioSegment.from_mp3(
+                f"{os.getcwd()}/audiobooks/{title}/{title}.mp3")
+
             file_counter = 1
             notes_dict = {}
 
