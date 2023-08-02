@@ -540,7 +540,7 @@ class AudibleAPI:
                         worksheet.set_row(i, 100, cell_format)
 
                     # Apply changes and save xlsx to Transcribed bookmarks folder.
-                    writer.save()
+                    writer.close()
 
                     # post_notion(heading, r.recognize_google(audio))
 
