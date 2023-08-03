@@ -511,9 +511,10 @@ class AudibleAPI:
                         f"{os.getcwd()}/trancribed_bookmarks/All_Transcriptions.xlsx", engine='xlsxwriter')
 
                     # Create a sheet in the same workbook for each file in the directory
-                    xcel.to_excel(writer, sheet_name=title)
+                    sheet_name = title[:31]
+                    xcel.to_excel(writer, sheet_name=sheet_name)
                     workbook = writer.book
-                    worksheet = writer.sheets[title]
+                    worksheet = writer.sheets[sheet_name]
 
                     # Create header format to be used in all headers
                     header_format = workbook.add_format({
