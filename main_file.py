@@ -511,7 +511,7 @@ class AudibleAPI:
                         f"{os.getcwd()}/trancribed_bookmarks/All_Transcriptions.xlsx", engine='xlsxwriter')
 
                     # Create a sheet in the same workbook for each file in the directory
-                    sheet_name = title[:31]
+                    sheet_name = title[:31].replace(":", "").replace("?", "")
                     xcel.to_excel(writer, sheet_name=sheet_name)
                     workbook = writer.book
                     worksheet = writer.sheets[sheet_name]
