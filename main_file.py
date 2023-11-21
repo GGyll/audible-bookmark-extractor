@@ -393,7 +393,7 @@ class AudibleAPI:
                 response_groups="product_desc, product_attrs"
             )
 
-            li_bookmarks = library.json().get("payload").get("records")
+            li_bookmarks = library.json().get("payload", {}).get("records", [])
             li_clips = sorted(
                 li_bookmarks, key=lambda i: i["type"], reverse=True)
 
