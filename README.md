@@ -41,5 +41,6 @@ Also, the purpose of the software is not to circumvent the DRM restrictions for 
 
 ## FAQ:
 sh: 1: ffmpeg: not found
-You need to install ffmpeg
+You need to install ffmpeg, refer to python-ffmpeg github doc
+https://github.com/kkroening/ffmpeg-python
 
