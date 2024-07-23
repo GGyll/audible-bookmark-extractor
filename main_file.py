@@ -17,7 +17,7 @@ country_code_mapping = {
     "us": ".com",
     "ca": ".ca",
     "uk": ".co.uk",
-    "au": ".co.au",
+    "au": ".com.au",
     "fr": ".fr",
     "de": ".de",
     "jp": ".co.jp",
