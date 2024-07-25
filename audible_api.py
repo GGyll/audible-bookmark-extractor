@@ -375,7 +375,8 @@ class AudibleAPI:
                     # Change header format so that rows can be edited
                     pandas.io.formats.excel.ExcelFormatter.header_style = None
 
-                    jsonHighlights.append(highlight)
+                    if highlight["text"]:
+                        jsonHighlights.append(highlight)
                     
                     # Create writer instance with desired path
                     writer = pd.ExcelWriter(
