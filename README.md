@@ -10,7 +10,7 @@ pip install -r requirements.txt
 After everything is installed:
 
 ```
-python main_file.py
+python main.py
 ```
 
 Type help for a list of useful commands
@@ -23,6 +23,8 @@ authenticate
 Then when prompted enter your email and password, a separate window will open to display your CAPTCHA, which the program will prompt you for as well. NOTE: The CAPTCHAS for Audible seem to be pretty tough (as in not easily readable) lately, so you may need to retry a few times to get one you can solve.
 
 Then you are logged into the Audible API and your credentials are stored in credentials.json, you won't need to authenticate again as long as you have this file.
+
+If you want to post highlights to readwise, run the readwise_* commands.
 
 
 ### On top of ffmpeg-python, you need FFMPEG installed on your computer, refer to python-ffmpeg github doc

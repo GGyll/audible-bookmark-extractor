@@ -7,7 +7,7 @@ import audible
 help_dict = {
     "authenticate": "Logs in to Audible and stores credentials locally to be re-used",
     "readwise_authenticate": "Logs in to Readwise and stores token locally",
-    "readwise_post_highlights": "Posts selected highlights to readwise",
+    "readwise_post_highlights": "Posts selected highlights to Readwise",
     "list_books": "Lists the users books",
     "download_books": "Downloads books and saves them locally",
     "convert_audiobook": "Removes Audible DRM from the selected audiobooks and converts them to .mp3 so they can be sliced",
