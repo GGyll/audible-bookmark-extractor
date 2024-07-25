@@ -1,4 +1,5 @@
 import os
+import json
 import sys
 import asyncio
 import requests
@@ -328,6 +329,7 @@ class AudibleAPI:
 
         # Create dictionary to store titles and transcriptions and new folder to store transcriptions
         pairs = {}
+        jsonHighlights = []
         
         for book in li_books:
 
@@ -344,7 +346,10 @@ class AudibleAPI:
                 os.makedirs(f"{artifacts_root_directory}/audiobooks/{title}/trancribed_clips/")
 
             for file in os.listdir(directory):
+                highlight = {}
                 filename = os.fsdecode(file)
+                highlight["title"] = title
+                highlight["source_type"] = "audible_bookmark_extractor"
                 if filename.endswith(".flac") or filename.endswith(".py"):
                     print(os.path.join(os.fsdecode(directory), filename))
                     heading = filename.replace(".flac", "")
@@ -354,26 +359,19 @@ class AudibleAPI:
                     with audioclip as source:
                         audio = r.record(source)
 
-                    # This commented out part is the CSV Exporter
-                        # Append heading and Transcription & Make a Dataframe to be later imported as CSV
-                        # pairs[str(heading)]=r.recognize_google(audio)
-                        #xcel = pd.DataFrame.from_dict(pairs, orient='index')
-                        #xcel.index.name = 'Book Name'
-                        #xcel.rename(columns={0:'Transcription'}, inplace= True)
-                        # xcel.to_csv(str(os.getcwd()+"/Trancribed_bookmarks/"+title)+".csv")
-
-                        # Append heading and transcription for the xslx option
                     try:
-                        pairs[str(heading)] = r.recognize_google(audio)
+                        text = r.recognize_google(audio)
+                        pairs[str(heading)] = text
+                        highlight["text"] = r.recognize_google(audio)
                     except Exception as e:
                         print(f"Error while recognizing this clip {heading}: {e}")
                     xcel = pd.DataFrame(pairs.values(), index=pairs.keys())
 
-                    # This part is the xlsx importer
-
                     # Change header format so that rows can be edited
                     pandas.io.formats.excel.ExcelFormatter.header_style = None
 
+                    jsonHighlights.append(highlight)
+                    
                     # Create writer instance with desired path
                     writer = pd.ExcelWriter(
                         f"{artifacts_root_directory}/audiobooks/{title}/trancribed_clips/All_Transcriptions.xlsx", engine='xlsxwriter')
@@ -409,7 +407,9 @@ class AudibleAPI:
                         worksheet.set_row(i, 100, cell_format)
 
                     # Apply changes and save xlsx to Transcribed bookmarks folder.
-                    writer.close()            
+                    writer.close()  
+            with open(f"{artifacts_root_directory}/audiobooks/{title}/trancribed_clips/contents.json", "w") as f:                
+                json.dump(jsonHighlights, f, indent=4)                
 
     def get_activation_bytes(self):
 
