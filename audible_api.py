@@ -12,6 +12,9 @@ from pydub import AudioSegment
 
 import speech_recognition as sr
 
+from errors import ExternalError
+from constants import artifacts_root_directory
+
 # not currently in use, but so the user can choose their store
 country_code_mapping = {
     "us": ".com",
@@ -45,19 +48,6 @@ help_dict = {
 
 AUTHLESS_COMMANDS = ["help", "authenticate"]
 
-# Used to display errors from Audible's API
-class ExternalError:
-
-    def __init__(self, initiator, asin, error):
-        self.initiator = initiator
-        self.asin = asin
-        self.error = error
-
-    def show_error(self):
-        print(
-            f"Error while executing {self.initiator}, for ASIN: {self.asin}, msg: {self.error}")
-
-
 class AudibleAPI:
 
     def __init__(self, auth):
@@ -73,8 +63,8 @@ class AudibleAPI:
         print("Enter help for a list of commands")
 
     async def cmd_authenticate(self):
-        if os.path.exists("credentials.json"):
-            print("You are already authenticated, to switch accounts, delete credentials.json and try again")
+        if os.path.exists(f"{artifacts_root_directory}/secrets/credentials.json"):
+            print(f"You are already authenticated, to switch accounts, delete secrets directory under {artifacts_root_directory} and try again")
             await self.main()
         email = input("Audible Email: ")
         password = getpass(
@@ -88,7 +78,9 @@ class AudibleAPI:
             locale=locale,
             with_username=False
         )
-        auth.to_file("credentials.json")
+        
+        os.makedirs(f"{artifacts_root_directory}/secrets/", exist_ok=True)
+        auth.to_file(f"{artifacts_root_directory}/secrets/credentials.json")
         print("Credentials saved locally successfully")
         self.auth = auth
 
@@ -97,7 +89,7 @@ class AudibleAPI:
     # Gets information about a book
     async def get_book_infos(self, asin):
         async with audible.AsyncClient(self.auth) as client:
-            try:
+            try:                
                 book = await client.get(
                     path=f"library/{asin}",
                     params={
@@ -222,12 +214,13 @@ class AudibleAPI:
 
                 audible_response = requests.get(re, stream=True)
 
-                path_exists = os.path.exists(f"audiobooks/{title}/")
+                path_exists = os.path.exists(f"{artifacts_root_directory}/audiobooks/{title}/")
                 if not path_exists:
-                    os.makedirs(f"audiobooks/{title}/")
+                    os.makedirs(f"{artifacts_root_directory}/audiobooks/{title}/")
+                    
 
                 if audible_response.ok:
-                    with open(f'audiobooks/{title}/{title}.aax', 'wb') as f:
+                    with open(f'{artifacts_root_directory}/audiobooks/{title}/{title}.aax', 'wb') as f:
                         print("Downloading %s" % raw_title)
 
                         total_length = audible_response.headers.get(
@@ -315,58 +308,7 @@ class AudibleAPI:
 
         await self.main()
 
-    # async def cmd_download_books(self):
-    #     all_books = {}
-
-    #     if not self.books:
-    #         await self.get_library()
-
-    #     for book in self.books:
-    #         if book is not None:
-    #             # breakpoint()
-    #             print(book["item"]["title"])
-    #             asin = book["item"]["asin"]
-    #             raw_title = book["item"]["title"]
-    #             title = raw_title.replace(" ", "_")
-    #             all_books[asin] = title
-
-    #             try:
-    #                 re = self.get_download_url(self.generate_url(
-    #                     COUNTRY_CODE, "download", asin), num_results=1000, response_groups="product_desc, product_attrs")
-    #             except audible.exceptions.NetworkError as e:
-    #                 ExternalError(self.get_download_url,
-    #                               asin, e).show_error()
-    #                 continue
-
-    #             audible_response = requests.get(re, stream=True)
-    #             if audible_response.ok:
-    #                 with open(f'audiobooks/{title}.aax', 'wb') as f:
-    #                     print("Downloading %s" % raw_title)
-
-    #                     total_length = audible_response.headers.get(
-    #                         'content-length')
-
-    #                     if total_length is None:  # no content length header
-    #                         f.write(audible_response.content)
-    #                     else:
-    #                         dl = 0
-    #                         total_length = int(total_length)
-    #                         print(total_length)
-    #                         for data in audible_response.iter_content(chunk_size=4096):
-    #                             dl += len(data)
-    #                             f.write(data)
-    #                             done = int(50 * dl / total_length)
-    #                             sys.stdout.write("\r[%s%s]" % (
-    #                                 '=' * done, ' ' * (50-done)))
-
-    #                             sys.stdout.write(
-    #                                 f"   {int(dl / total_length * 100)}%")
-    #                             sys.stdout.flush()
-
-    #                     f.write(audible_response.content)
-
-    #             else:
-    #                 print(audible_response.text)
+   
 
     async def cmd_get_bookmarks(self):
         li_books = await self.get_book_selection()
@@ -399,15 +341,15 @@ class AudibleAPI:
 
             # Load audiobook into AudioSegment so we can slice it
             audio_book = AudioSegment.from_mp3(
-                f"{os.getcwd()}/audiobooks/{title}/{title}.mp3")
+                f"{artifacts_root_directory}/audiobooks/{title}/{title}.mp3")
 
             file_counter = 1
             notes_dict = {}
 
             # Check whether a folder in clips/ for the book exists or not
-            path_exists = os.path.exists(f"clips/{title}")
+            path_exists = os.path.exists(f"{artifacts_root_directory}/audiobooks/{title}/clips/")
             if not path_exists:
-                os.makedirs(f"clips/{title}")
+                os.makedirs(f"{artifacts_root_directory}/audiobooks/{title}/clips/")
 
             for audio_clip in li_clips:
                 # Get start position to slice
@@ -434,7 +376,7 @@ class AudibleAPI:
 
                     # Save the clip
                     clip.export(
-                        f"{os.getcwd()}/clips/{title}/{file_name}.flac", format="flac")
+                        f"{artifacts_root_directory}/audiobooks/{title}/clips/{file_name}.flac", format="flac")
                     file_counter += 1
 
     async def cmd_convert_audiobook(self):
@@ -452,11 +394,11 @@ class AudibleAPI:
             # Strips Audible DRM  from audiobook
             activation_bytes = self.get_activation_bytes()
             os.system(
-                f"ffmpeg -activation_bytes {activation_bytes} -i audiobooks/{title}/{title}.aax -c copy audiobooks/{title}/{title}.m4b")
+                f"ffmpeg -activation_bytes {activation_bytes} -i {artifacts_root_directory}/audiobooks/{title}/{title}.aax -c copy {artifacts_root_directory}/audiobooks/{title}/{title}.m4b")
 
             # Converts audiobook to .mp3
             os.system(
-                f"ffmpeg -i audiobooks/{title}/{title}.m4b audiobooks/{title}/{title}.mp3")
+                f"ffmpeg -i {artifacts_root_directory}/audiobooks/{title}/{title}.m4b {artifacts_root_directory}/audiobooks/{title}/{title}.mp3")
 
             await self.main()
 
@@ -467,16 +409,20 @@ class AudibleAPI:
 
         # Create dictionary to store titles and transcriptions and new folder to store transcriptions
         pairs = {}
-
-        # Re check if path exists if not create one
-        path_exists = os.path.exists(os.getcwd()+"/trancribed_bookmarks")
-        if not path_exists:
-            os.mkdir(str(os.getcwd())+"/trancribed_bookmarks")
-
+        
         for book in li_books:
+
             _title = book.get("title", {}).get("title", {})
             title = _title.lower().replace(" ", "_")
-            directory = os.fsencode(f"clips/{title}/")
+            directory = os.fsencode(f"{artifacts_root_directory}/audiobooks/{title}/clips/")
+
+            path_exists = os.path.exists(directory)
+            if not path_exists:
+                os.makedirs(directory)
+
+            trancribed_clips_path_exists = os.path.exists(f"{artifacts_root_directory}/audiobooks/{title}/trancribed_clips/")
+            if not trancribed_clips_path_exists:
+                os.makedirs(f"{artifacts_root_directory}/audiobooks/{title}/trancribed_clips/")
 
             for file in os.listdir(directory):
                 filename = os.fsdecode(file)
@@ -498,8 +444,11 @@ class AudibleAPI:
                         # xcel.to_csv(str(os.getcwd()+"/Trancribed_bookmarks/"+title)+".csv")
 
                         # Append heading and transcription for the xslx option
+                    try:
                         pairs[str(heading)] = r.recognize_google(audio)
-                        xcel = pd.DataFrame(pairs.values(), index=pairs.keys())
+                    except Exception as e:
+                        print(f"Error while recognizing this clip {heading}: {e}")
+                    xcel = pd.DataFrame(pairs.values(), index=pairs.keys())
 
                     # This part is the xlsx importer
 
@@ -508,7 +457,7 @@ class AudibleAPI:
 
                     # Create writer instance with desired path
                     writer = pd.ExcelWriter(
-                        f"{os.getcwd()}/trancribed_bookmarks/All_Transcriptions.xlsx", engine='xlsxwriter')
+                        f"{artifacts_root_directory}/audiobooks/{title}/trancribed_clips/All_Transcriptions.xlsx", engine='xlsxwriter')
 
                     # Create a sheet in the same workbook for each file in the directory
                     sheet_name = title[:31].replace(":", "").replace("?", "")
@@ -542,67 +491,20 @@ class AudibleAPI:
 
                     # Apply changes and save xlsx to Transcribed bookmarks folder.
                     writer.close()
-
-                    # post_notion(heading, r.recognize_google(audio))
-
-        async def cmd_authenticate_notion(self):
-            pass
-
-        async def post_notion(self, text_heading, text_content):
-            if not self.notion_token:
-                # Prompt user to authenticate and provide their notion_token before continuing
-                print("")
-            url = "https://api.notion.com/v1/pages"
-
-            data = {
-                "parent": {"database_id": "1b9cbc3855e942e6b6ecf9bc0bde3a49"},
-                "properties": {
-                    "Heading": {
-                        "title": [
-                            {
-                                "text": {
-                                    "content": text_heading
-                                }
-                            }
-                        ]
-                    },
-                    "Content": {
-                        "rich_text": [
-                            {
-                                "text": {
-                                    "content": text_content
-                                }
-                            }
-                        ]
-                    }
-                }}
-            import json
-            data = json.dumps(data)
-
-            headers = {
-                "Authorization": f"Bearer {self.notion_token}",
-                "Accept": "application/json",
-                "Notion-Version": "2022-02-22",
-                "Content-Type": "application/json"
-            }
-
-            response = requests.post(url, headers=headers, data=data)
-
-            print(response.text)
-
+            await self.main()
 
     def get_activation_bytes(self):
 
         # we already have activation bytes
-        if os.path.exists("activation_bytes.txt"):
-            with open('activation_bytes.txt') as f:
+        if os.path.exists(f"{artifacts_root_directory}secrets/activation_bytes.txt"):
+            with open(f'{artifacts_root_directory}/secrets/activation_bytes.txt') as f:
                 activation_bytes = f.readlines()[0]
 
         # we don't, so let's get them
         else:
             activation_bytes = self.auth.get_activation_bytes(
-                "activation_bytes.txt", True)
-            text_file = open("activation_bytes.txt", "w")
+                f"{artifacts_root_directory}/secrets/activation_bytes.txt", True)
+            text_file = open(f"{artifacts_root_directory}/secrets/activation_bytes.txt", "w")
             n = text_file.write(activation_bytes)
             text_file.close()
 
@@ -610,17 +512,3 @@ class AudibleAPI:
 
     def bookmark_response_callback(self, resp):
         return resp
-
-
-if __name__ == "__main__":
-    # authenticate with login
-    try:
-        credentials = audible.Authenticator.from_file("credentials.json")
-    except FileNotFoundError:
-        credentials = None
-
-    loop = asyncio.get_event_loop()
-
-    audible_obj = AudibleAPI(credentials)
-    loop.run_until_complete(audible_obj.welcome())
-    loop.run_until_complete(audible_obj.main())
