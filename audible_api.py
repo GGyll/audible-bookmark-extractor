@@ -334,6 +334,8 @@ class AudibleAPI:
         for book in li_books:
 
             _title = book.get("title", {}).get("title", {})
+            _authors = book.get("title", {}).get("authors", {})
+            allAuthors = ", ".join(item['name'] for item in _authors)
             title = _title.lower().replace(" ", "_")
             directory = os.fsencode(f"{artifacts_root_directory}/audiobooks/{title}/clips/")
 
@@ -348,7 +350,8 @@ class AudibleAPI:
             for file in os.listdir(directory):
                 highlight = {}
                 filename = os.fsdecode(file)
-                highlight["title"] = title
+                highlight["title"] = _title
+                highlight["author"] = allAuthors
                 highlight["source_type"] = "audible_bookmark_extractor"
                 if filename.endswith(".flac") or filename.endswith(".py"):
                     print(os.path.join(os.fsdecode(directory), filename))
