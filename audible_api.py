@@ -352,8 +352,10 @@ class AudibleAPI:
                 filename = os.fsdecode(file)
                 highlight["title"] = _title
                 highlight["author"] = allAuthors
+                if not filename.startswith("clip"):
+                    highlight["note"] = filename.replace(".flac", "")
                 highlight["source_type"] = "audible_bookmark_extractor"
-                if filename.endswith(".flac") or filename.endswith(".py"):
+                if filename.endswith(".flac"):
                     print(os.path.join(os.fsdecode(directory), filename))
                     heading = filename.replace(".flac", "")
 
