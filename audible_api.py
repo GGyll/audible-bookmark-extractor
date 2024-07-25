@@ -37,17 +37,6 @@ AUDIBLE_URL_BASE = "https://www.audible"
 START_POSITION_OFFSET = 10000
 END_POSITION_OFFSET = 0
 
-help_dict = {
-    "authenticate": "Logs in to Audible and stores credentials locally to be re-used",
-    "list_books": "Lists the users books",
-    "download_books": "Downloads books and saves them locally",
-    "convert_audiobook": "Removes Audible DRM from the selected audiobooks and converts them to .mp3 so they can be sliced",
-    "get_bookmarks": "WIP, extracts all timestamps for bookmarks in the selected audiobook",
-    "transcribe_bookmarks": "Self-explanatory, connects to Speech Recognition API and outputs the result"
-}
-
-AUTHLESS_COMMANDS = ["help", "authenticate"]
-
 class AudibleAPI:
 
     def __init__(self, auth):
@@ -55,17 +44,9 @@ class AudibleAPI:
         self.books = []
         self.library = {}
 
-    # CLI loaded for first time
-    async def welcome(self):
-        print("Audible Bookmark Extractor v1.0")
-        print("Enter CTRL + C to exit")
-        print("To download your audiobooks, ensure you are authenticated, then enter download_books")
-        print("Enter help for a list of commands")
-
     async def cmd_authenticate(self):
         if os.path.exists(f"{artifacts_root_directory}/secrets/credentials.json"):
             print(f"You are already authenticated, to switch accounts, delete secrets directory under {artifacts_root_directory} and try again")
-            await self.main()
         email = input("Audible Email: ")
         password = getpass(
             "Enter Password (will be hidden, press ENTER when done): ")
@@ -83,8 +64,6 @@ class AudibleAPI:
         auth.to_file(f"{artifacts_root_directory}/secrets/credentials.json")
         print("Credentials saved locally successfully")
         self.auth = auth
-
-        await self.main()
 
     # Gets information about a book
     async def get_book_infos(self, asin):
@@ -106,49 +85,6 @@ class AudibleAPI:
                 return book
             except Exception as e:
                 print(e)
-
-    # Main command screen
-    async def main(self):
-        if not self.auth:
-            print(
-                "\nNo Audible credentials found, please run 'authenticate' to generate them")
-        await self.enter_command()
-
-    # Takes a command and splits it to see if any additional kwargs were supplied i.e --asin="B04EFJIFJI"
-    async def enter_command(self):
-        command_input = input("\n\nEnter command: ")
-        command = command_input.split(" ")[0]
-        additional_kwargs = command_input.replace(command, '')
-        _kwargs = {}
-
-        if additional_kwargs:
-            for kwarg in additional_kwargs.split(" --"):
-                if kwarg == "":
-                    continue
-                li_kwarg = kwarg.split("=")
-
-                if not len(li_kwarg) > 1:
-                    await self.invalid_kwarg_callback()
-
-                _kwargs[li_kwarg[0]] = li_kwarg[1]
-
-        if not self.auth and command not in AUTHLESS_COMMANDS:
-            await self.invalid_auth_callback()
-        # Takes the command supplied and sees if we have a function with the prefix cmd_ that we can execute with the given kwargs
-        await getattr(self, f"cmd_{command}", self.invalid_command_callback)(**_kwargs)
-
-    # Callbacks
-    async def invalid_command_callback(self):
-        print("Invalid command, try again")
-        await self.main()
-
-    async def invalid_kwarg_callback(self):
-        print("Invalid command or arguments supplied, try again")
-        await self.main()
-
-    async def invalid_auth_callback(self):
-        print("Invalid Audible credentials, run authenticate and try again")
-        await self.main()
 
     # Helper function for displaying the users books and allowing them to select one based on the index number
     async def get_book_selection(self):
@@ -242,11 +178,9 @@ class AudibleAPI:
 
                                 sys.stdout.write(f"   {int(dl / total_length * 100)}%")
                                 sys.stdout.flush()
-                            await self.main()
 
                 else:
                     print(audible_response.text)
-                    await self.main()
 
     # WIP
     def generate_url(self, country_code, url_type, asin=None):
@@ -272,15 +206,7 @@ class AudibleAPI:
             await self.cmd_show_library()
 
         await self.cmd_show_library()
-
-        await self.main()
-
-    async def cmd_help(self):
-        for key in help_dict:
-            print(f"{key} -- {help_dict[key]}")
-        print("Enter CTRL + C to exit the program")
-        await self.main()
-
+        
     # Gets all books and info for account and adds it to self.books, also returns ASIN for all books
     async def get_library(self):
         async with audible.AsyncClient(self.auth) as client:
@@ -305,9 +231,6 @@ class AudibleAPI:
 
         for index, book_title in enumerate(self.books):
             print(f"{index}: {book_title}")
-
-        await self.main()
-
    
 
     async def cmd_get_bookmarks(self):
@@ -315,8 +238,6 @@ class AudibleAPI:
 
         for book in li_books:
             print(self.get_bookmarks(book))
-
-        await self.main()
 
     def get_bookmarks(self, book):
         asin = book.get("asin")
@@ -399,8 +320,6 @@ class AudibleAPI:
             # Converts audiobook to .mp3
             os.system(
                 f"ffmpeg -i {artifacts_root_directory}/audiobooks/{title}/{title}.m4b {artifacts_root_directory}/audiobooks/{title}/{title}.mp3")
-
-            await self.main()
 
     async def cmd_transcribe_bookmarks(self):
         li_books = await self.get_book_selection()
@@ -490,8 +409,7 @@ class AudibleAPI:
                         worksheet.set_row(i, 100, cell_format)
 
                     # Apply changes and save xlsx to Transcribed bookmarks folder.
-                    writer.close()
-            await self.main()
+                    writer.close()            
 
     def get_activation_bytes(self):
 
