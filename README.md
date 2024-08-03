@@ -16,7 +16,7 @@ python main_file.py
 Type help for a list of useful commands
 
 ### Authentication
-#### Note, you need 2FA activated on your Audible account
+#### Note: you need 2FA activated on your Audible account
 Run command 
 ```
 authenticate
