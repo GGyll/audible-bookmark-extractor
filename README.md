@@ -16,6 +16,7 @@ python main_file.py
 Type help for a list of useful commands
 
 ### Authentication
+## Note, you need 2FA activated on your Audible account
 Run command 
 ```
 authenticate
@@ -44,3 +45,5 @@ sh: 1: ffmpeg: not found
 You need to install ffmpeg, refer to python-ffmpeg github doc
 https://github.com/kkroening/ffmpeg-python
 
+I'm prompted for a CVF code when trying to authenticate, and then the program crashes
+You need to enable 2FA on your Audible account
