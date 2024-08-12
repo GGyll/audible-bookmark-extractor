@@ -32,6 +32,7 @@ class Command:
     # authenticate with login
     try:
         credentials = audible.Authenticator.from_file(f"{artifacts_root_directory}/secrets/credentials.json")
+        self.audible_obj = AudibleAPI(credentials)
     except FileNotFoundError:
         print("\nNo Audible credentials found, please run 'authenticate' to generate them")
         credentials = None
@@ -39,12 +40,10 @@ class Command:
     try:
       with open(f"{artifacts_root_directory}/secrets/readwise_token.json", "r") as file:
         token = file.read()
+        self.readwise_obj = Readwise(token)
     except FileNotFoundError:
         print("\nNo Readwise Token found, please run 'readwise-authenticate' to generate them")
         token = None
-
-    self.audible_obj = AudibleAPI(credentials)
-    self.readwise_obj = Readwise(token)
     
     print("Audible Bookmark Extractor v1.0")
     print("To download your audiobooks, ensure you are authenticated, then enter download_books")
