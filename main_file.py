@@ -1,16 +1,14 @@
+import asyncio
 import os
 import sys
-import asyncio
-import requests
 from getpass import getpass
 
+import audible
 import pandas as pd
 import pandas.io.formats.excel
-import audible
-
-from pydub import AudioSegment
-
+import requests
 import speech_recognition as sr
+from pydub import AudioSegment
 
 # not currently in use, but so the user can choose their store
 country_code_mapping = {
@@ -23,7 +21,7 @@ country_code_mapping = {
     "jp": ".co.jp",
     "it": ".it",
     "in": ".co.in",
-    "es": ".es"
+    "es": ".es",
 }
 
 AUDIBLE_URL_BASE = "https://www.audible"
@@ -40,10 +38,12 @@ help_dict = {
     "download_books": "Downloads books and saves them locally",
     "convert_audiobook": "Removes Audible DRM from the selected audiobooks and converts them to .mp3 so they can be sliced",
     "get_bookmarks": "WIP, extracts all timestamps for bookmarks in the selected audiobook",
-    "transcribe_bookmarks": "Self-explanatory, connects to Speech Recognition API and outputs the result"
+    "transcribe_bookmarks": "Self-explanatory, connects to Speech Recognition API and outputs the result",
+    "exit": "Exits the program",
 }
 
 AUTHLESS_COMMANDS = ["help", "authenticate"]
+
 
 # Used to display errors from Audible's API
 class ExternalError:
@@ -55,7 +55,8 @@ class ExternalError:
 
     def show_error(self):
         print(
-            f"Error while executing {self.initiator}, for ASIN: {self.asin}, msg: {self.error}")
+            f"Error while executing {self.initiator}, for ASIN: {self.asin}, msg: {self.error}"
+        )
 
 
 class AudibleAPI:
@@ -68,25 +69,25 @@ class AudibleAPI:
     # CLI loaded for first time
     async def welcome(self):
         print("Audible Bookmark Extractor v1.0")
-        print("Enter CTRL + C to exit")
-        print("To download your audiobooks, ensure you are authenticated, then enter download_books")
+        print("Enter exit to exit the program")
+        print(
+            "To download your audiobooks, ensure you are authenticated, then enter download_books"
+        )
         print("Enter help for a list of commands")
 
     async def cmd_authenticate(self):
         if os.path.exists("credentials.json"):
-            print("You are already authenticated, to switch accounts, delete credentials.json and try again")
+            print(
+                "You are already authenticated, to switch accounts, delete credentials.json and try again"
+            )
             await self.main()
         email = input("Audible Email: ")
-        password = getpass(
-            "Enter Password (will be hidden, press ENTER when done): ")
-        print(', '.join(country_code_mapping))
+        password = getpass("Enter Password (will be hidden, press ENTER when done): ")
+        print(", ".join(country_code_mapping))
         locale = input("\nPlease enter your locale from the list above: ")
 
         auth = audible.Authenticator.from_login(
-            email,
-            password,
-            locale=locale,
-            with_username=False
+            email, password, locale=locale, with_username=False
         )
         auth.to_file("credentials.json")
         print("Credentials saved locally successfully")
@@ -109,7 +110,7 @@ class AudibleAPI:
                             "category_ladders, claim_code_url, is_downloaded, pdf_url, "
                             "is_returnable, origin_asin, percent_complete, provided_review"
                         )
-                    }
+                    },
                 )
                 return book
             except Exception as e:
@@ -119,14 +120,15 @@ class AudibleAPI:
     async def main(self):
         if not self.auth:
             print(
-                "\nNo Audible credentials found, please run 'authenticate' to generate them")
+                "\nNo Audible credentials found, please run 'authenticate' to generate them"
+            )
         await self.enter_command()
 
     # Takes a command and splits it to see if any additional kwargs were supplied i.e --asin="B04EFJIFJI"
     async def enter_command(self):
         command_input = input("\n\nEnter command: ")
         command = command_input.split(" ")[0]
-        additional_kwargs = command_input.replace(command, '')
+        additional_kwargs = command_input.replace(command, "")
         _kwargs = {}
 
         if additional_kwargs:
@@ -172,16 +174,25 @@ class AudibleAPI:
             print(f"{index}: {book_title}")
 
         book_selection = input(
-            "Enter the index number of the book you would like to download, or enter --all for all available books: \n")
+            "Enter the index number of the book you would like to download, or enter --all for all available books: \n"
+        )
 
         if book_selection == "--all":
-            li_books = [{"title": book.get("title", 'untitled'), "asin": book["asin"]}
-                        for book in self.library["items"]]
+            li_books = [
+                {"title": book.get("title", "untitled"), "asin": book["asin"]}
+                for book in self.library["items"]
+            ]
 
         else:
             try:
-                li_books = [{"title": self.library["items"][int(book_selection)],
-                             "asin":self.library["items"][int(book_selection)].get("asin", None)}]
+                li_books = [
+                    {
+                        "title": self.library["items"][int(book_selection)],
+                        "asin": self.library["items"][int(book_selection)].get(
+                            "asin", None
+                        ),
+                    }
+                ]
             except (IndexError, ValueError):
                 print("Invalid selection")
                 await self.invalid_command_callback()
@@ -193,10 +204,7 @@ class AudibleAPI:
 
         tasks = []
         for book in li_books:
-            tasks.append(
-                asyncio.ensure_future(
-                    self.get_book_infos(
-                        book.get("asin"))))
+            tasks.append(asyncio.ensure_future(self.get_book_infos(book.get("asin"))))
 
         books = await asyncio.gather(*tasks)
 
@@ -212,12 +220,17 @@ class AudibleAPI:
 
                 # Attempt to download book
                 try:
-                    re = self.get_download_url(self.generate_url(self.auth.locale.country_code, "download", asin), num_results=1000, response_groups="product_desc, product_attrs")
+                    re = self.get_download_url(
+                        self.generate_url(
+                            self.auth.locale.country_code, "download", asin
+                        ),
+                        num_results=1000,
+                        response_groups="product_desc, product_attrs",
+                    )
 
                 # Audible API throws error, usually for free books that are not allowed to be downloaded, we skip to the next
                 except audible.exceptions.NetworkError as e:
-                    ExternalError(self.get_download_url,
-                                  asin, e).show_error()
+                    ExternalError(self.get_download_url, asin, e).show_error()
                     continue
 
                 audible_response = requests.get(re, stream=True)
@@ -227,25 +240,29 @@ class AudibleAPI:
                     os.makedirs(f"audiobooks/{title}/")
 
                 if audible_response.ok:
-                    with open(f'audiobooks/{title}/{title}.aax', 'wb') as f:
+                    with open(f"audiobooks/{title}/{title}.aax", "wb") as f:
                         print("Downloading %s" % raw_title)
 
-                        total_length = audible_response.headers.get(
-                            'content-length')
+                        total_length = audible_response.headers.get("content-length")
 
                         if total_length is None:  # no content length header
                             print(
-                                "Unable to estimate download size, downloading, this might take a while...")
+                                "Unable to estimate download size, downloading, this might take a while..."
+                            )
                             f.write(audible_response.content)
                         else:
                             # Save book locally and calculate and print download progress (progress bar)
                             dl = 0
                             total_length = int(total_length)
-                            for data in audible_response.iter_content(chunk_size=1024*1024):
+                            for data in audible_response.iter_content(
+                                chunk_size=1024 * 1024
+                            ):
                                 dl += len(data)
                                 f.write(data)
                                 done = int(50 * dl / total_length)
-                                sys.stdout.write("\r[%s%s]" % ('=' * done, ' ' * (50-done)))
+                                sys.stdout.write(
+                                    "\r[%s%s]" % ("=" * done, " " * (50 - done))
+                                )
 
                                 sys.stdout.write(f"   {int(dl / total_length * 100)}%")
                                 sys.stdout.flush()
@@ -267,11 +284,10 @@ class AudibleAPI:
     # Sends a request to get the download link for the selected book
     def get_download_url(self, url, **kwargs):
 
-        with audible.Client(auth=self.auth, response_callback=self.get_download_link_callback) as client:
-            library = client.get(
-                url,
-                **kwargs
-            )
+        with audible.Client(
+            auth=self.auth, response_callback=self.get_download_link_callback
+        ) as client:
+            library = client.get(url, **kwargs)
             return library.url
 
     async def cmd_list_books(self):
@@ -285,18 +301,15 @@ class AudibleAPI:
     async def cmd_help(self):
         for key in help_dict:
             print(f"{key} -- {help_dict[key]}")
-        print("Enter CTRL + C to exit the program")
         await self.main()
+
+    async def cmd_exit(self):
+        exit()
 
     # Gets all books and info for account and adds it to self.books, also returns ASIN for all books
     async def get_library(self):
         async with audible.AsyncClient(self.auth) as client:
-            self.library = await client.get(
-                path="library",
-                params={
-                    "num_results": 999
-                }
-            )
+            self.library = await client.get(path="library", params={"num_results": 999})
             asins = [book["asin"] for book in self.library["items"]]
 
             for book in self.library["items"]:
@@ -378,7 +391,7 @@ class AudibleAPI:
 
     def get_bookmarks(self, book):
         asin = book.get("asin")
-        _title = book.get("title", {}).get("title", 'untitled')
+        _title = book.get("title", {}).get("title", "untitled")
         if not _title:
             return
 
@@ -386,20 +399,22 @@ class AudibleAPI:
 
         bookmarks_url = f"https://cde-ta-g7g.amazon.com/FionaCDEServiceEngine/sidecar?type=AUDI&key={asin}"
         print(f"Getting bookmarks for {_title}")
-        with audible.Client(auth=self.auth, response_callback=self.bookmark_response_callback) as client:
+        with audible.Client(
+            auth=self.auth, response_callback=self.bookmark_response_callback
+        ) as client:
             library = client.get(
                 bookmarks_url,
                 num_results=1000,
-                response_groups="product_desc, product_attrs"
+                response_groups="product_desc, product_attrs",
             )
 
             li_bookmarks = library.json().get("payload", {}).get("records", [])
-            li_clips = sorted(
-                li_bookmarks, key=lambda i: i["type"], reverse=True)
+            li_clips = sorted(li_bookmarks, key=lambda i: i["type"], reverse=True)
 
             # Load audiobook into AudioSegment so we can slice it
             audio_book = AudioSegment.from_mp3(
-                f"{os.getcwd()}/audiobooks/{title}/{title}.mp3")
+                f"{os.getcwd()}/audiobooks/{title}/{title}.mp3"
+            )
 
             file_counter = 1
             notes_dict = {}
@@ -416,25 +431,26 @@ class AudibleAPI:
                 # If we have a note then we save it so we can use it as the title for the bookmark text
                 if audio_clip.get("type", None) in ["audible.note"]:
                     notes_dict[raw_start_pos] = audio_clip.get("text")
-                    print(
-                        f"CLIP: {notes_dict[raw_start_pos]}  {raw_start_pos}")
+                    print(f"CLIP: {notes_dict[raw_start_pos]}  {raw_start_pos}")
 
                 if audio_clip.get("type", None) in ["audible.clip", "audible.bookmark"]:
                     start_pos = raw_start_pos - START_POSITION_OFFSET
-                    end_pos = int(audio_clip.get(
-                        "endPosition", raw_start_pos + 30000)) + END_POSITION_OFFSET
+                    end_pos = (
+                        int(audio_clip.get("endPosition", raw_start_pos + 30000))
+                        + END_POSITION_OFFSET
+                    )
                     if start_pos == end_pos:
                         end_pos += 30000
 
                     # Slice it up
                     clip = audio_book[start_pos:end_pos]
 
-                    file_name = notes_dict.get(
-                        raw_start_pos, f"clip{file_counter}")
+                    file_name = notes_dict.get(raw_start_pos, f"clip{file_counter}")
 
                     # Save the clip
                     clip.export(
-                        f"{os.getcwd()}/clips/{title}/{file_name}.flac", format="flac")
+                        f"{os.getcwd()}/clips/{title}/{file_name}.flac", format="flac"
+                    )
                     file_counter += 1
 
     async def cmd_convert_audiobook(self):
@@ -452,11 +468,13 @@ class AudibleAPI:
             # Strips Audible DRM  from audiobook
             activation_bytes = self.get_activation_bytes()
             os.system(
-                f"ffmpeg -activation_bytes {activation_bytes} -i audiobooks/{title}/{title}.aax -c copy audiobooks/{title}/{title}.m4b")
+                f"ffmpeg -activation_bytes {activation_bytes} -i audiobooks/{title}/{title}.aax -c copy audiobooks/{title}/{title}.m4b"
+            )
 
             # Converts audiobook to .mp3
             os.system(
-                f"ffmpeg -i audiobooks/{title}/{title}.m4b audiobooks/{title}/{title}.mp3")
+                f"ffmpeg -i audiobooks/{title}/{title}.m4b audiobooks/{title}/{title}.mp3"
+            )
 
             await self.main()
 
@@ -469,9 +487,9 @@ class AudibleAPI:
         pairs = {}
 
         # Re check if path exists if not create one
-        path_exists = os.path.exists(os.getcwd()+"/trancribed_bookmarks")
+        path_exists = os.path.exists(os.getcwd() + "/trancribed_bookmarks")
         if not path_exists:
-            os.mkdir(str(os.getcwd())+"/trancribed_bookmarks")
+            os.mkdir(str(os.getcwd()) + "/trancribed_bookmarks")
 
         for book in li_books:
             _title = book.get("title", {}).get("title", {})
@@ -484,17 +502,18 @@ class AudibleAPI:
                     print(os.path.join(os.fsdecode(directory), filename))
                     heading = filename.replace(".flac", "")
 
-                    audioclip = sr.AudioFile(os.path.join(
-                        os.fsdecode(directory), filename))
+                    audioclip = sr.AudioFile(
+                        os.path.join(os.fsdecode(directory), filename)
+                    )
                     with audioclip as source:
                         audio = r.record(source)
 
-                    # This commented out part is the CSV Exporter
+                        # This commented out part is the CSV Exporter
                         # Append heading and Transcription & Make a Dataframe to be later imported as CSV
                         # pairs[str(heading)]=r.recognize_google(audio)
-                        #xcel = pd.DataFrame.from_dict(pairs, orient='index')
-                        #xcel.index.name = 'Book Name'
-                        #xcel.rename(columns={0:'Transcription'}, inplace= True)
+                        # xcel = pd.DataFrame.from_dict(pairs, orient='index')
+                        # xcel.index.name = 'Book Name'
+                        # xcel.rename(columns={0:'Transcription'}, inplace= True)
                         # xcel.to_csv(str(os.getcwd()+"/Trancribed_bookmarks/"+title)+".csv")
 
                         # Append heading and transcription for the xslx option
@@ -508,7 +527,9 @@ class AudibleAPI:
 
                     # Create writer instance with desired path
                     writer = pd.ExcelWriter(
-                        f"{os.getcwd()}/trancribed_bookmarks/All_Transcriptions.xlsx", engine='xlsxwriter')
+                        f"{os.getcwd()}/trancribed_bookmarks/All_Transcriptions.xlsx",
+                        engine="xlsxwriter",
+                    )
 
                     # Create a sheet in the same workbook for each file in the directory
                     sheet_name = title[:31].replace(":", "").replace("?", "")
@@ -517,12 +538,15 @@ class AudibleAPI:
                     worksheet = writer.sheets[sheet_name]
 
                     # Create header format to be used in all headers
-                    header_format = workbook.add_format({
-                        "valign": "vcenter",
-                        "align": "center",
-                        "bg_color": "#FFA500",
-                        "bold": True,
-                        "font_color": "#FFFFFF"})  # transcribe_bookmarks
+                    header_format = workbook.add_format(
+                        {
+                            "valign": "vcenter",
+                            "align": "center",
+                            "bg_color": "#FFA500",
+                            "bold": True,
+                            "font_color": "#FFFFFF",
+                        }
+                    )  # transcribe_bookmarks
 
                     # Set desired cell format
                     cell_format = workbook.add_format()
@@ -531,13 +555,13 @@ class AudibleAPI:
                     cell_format.set_text_wrap(True)
 
                     # Apply header format and format columns to fit data
-                    worksheet.write(0, 0, 'Clip Note', header_format)
-                    worksheet.write(0, 1, 'Transcription', header_format)
+                    worksheet.write(0, 0, "Clip Note", header_format)
+                    worksheet.write(0, 1, "Transcription", header_format)
                     worksheet.set_column("B:B", 100)
                     worksheet.set_column("A:A", 50)
 
                     # Format cells for appropiate size, wrap the text for style points
-                    for i in range(1, (len(xcel)+1)):
+                    for i in range(1, (len(xcel) + 1)):
                         worksheet.set_row(i, 100, cell_format)
 
                     # Apply changes and save xlsx to Transcribed bookmarks folder.
@@ -557,51 +581,37 @@ class AudibleAPI:
             data = {
                 "parent": {"database_id": "1b9cbc3855e942e6b6ecf9bc0bde3a49"},
                 "properties": {
-                    "Heading": {
-                        "title": [
-                            {
-                                "text": {
-                                    "content": text_heading
-                                }
-                            }
-                        ]
-                    },
-                    "Content": {
-                        "rich_text": [
-                            {
-                                "text": {
-                                    "content": text_content
-                                }
-                            }
-                        ]
-                    }
-                }}
+                    "Heading": {"title": [{"text": {"content": text_heading}}]},
+                    "Content": {"rich_text": [{"text": {"content": text_content}}]},
+                },
+            }
             import json
+
             data = json.dumps(data)
 
             headers = {
                 "Authorization": f"Bearer {self.notion_token}",
                 "Accept": "application/json",
                 "Notion-Version": "2022-02-22",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
             }
 
             response = requests.post(url, headers=headers, data=data)
 
             print(response.text)
 
-
     def get_activation_bytes(self):
 
         # we already have activation bytes
         if os.path.exists("activation_bytes.txt"):
-            with open('activation_bytes.txt') as f:
+            with open("activation_bytes.txt") as f:
                 activation_bytes = f.readlines()[0]
 
         # we don't, so let's get them
         else:
             activation_bytes = self.auth.get_activation_bytes(
-                "activation_bytes.txt", True)
+                "activation_bytes.txt", True
+            )
             text_file = open("activation_bytes.txt", "w")
             n = text_file.write(activation_bytes)
             text_file.close()
