@@ -369,6 +369,7 @@ class AudibleAPI:
                         pairs[str(heading)] = text
                         highlight["text"] = r.recognize_google(audio)
                     except Exception as e:
+                        highlight["text"] = ""
                         print(f"Error while recognizing this clip {heading}: {e}")
                     xcel = pd.DataFrame(pairs.values(), index=pairs.keys())
 

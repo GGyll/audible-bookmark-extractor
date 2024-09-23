@@ -78,8 +78,9 @@ class Command:
     elif command == "quit" or command == "exit":
       return
     elif command.startswith("readwise"):
+        books = await self.audible_obj.get_book_selection()
         command = command.replace("readwise_", "")
-        await getattr(self.readwise_obj, f"cmd_{command}", self.invalid_command_callback)(**_kwargs)    
+        await getattr(self.readwise_obj, f"cmd_{command}", self.invalid_command_callback)(books, **_kwargs)    
     else:    
         await getattr(self.audible_obj, f"cmd_{command}", self.invalid_command_callback)(**_kwargs)
     

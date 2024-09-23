@@ -16,7 +16,7 @@ class Readwise:
       
       os.makedirs(f"{artifacts_root_directory}/secrets/", exist_ok=True)
       with open(f"{artifacts_root_directory}/secrets/readwise_token.json", "w") as f:
-        f.write(str(self.token))
+        f.write(str(token))
       print("Token saved locally successfully")
       
       return Readwise(token)
