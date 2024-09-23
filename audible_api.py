@@ -45,7 +45,8 @@ class AudibleAPI:
         self.books = []
         self.library = {}
 
-    async def cmd_authenticate(self):
+    @classmethod
+    async def authenticate(self) -> "AudibleAPI":
         if os.path.exists(f"{artifacts_root_directory}/secrets/credentials.json"):
             print(f"You are already authenticated, to switch accounts, delete secrets directory under {artifacts_root_directory} and try again")
         email = input("Audible Email: ")
@@ -64,7 +65,7 @@ class AudibleAPI:
         os.makedirs(f"{artifacts_root_directory}/secrets/", exist_ok=True)
         auth.to_file(f"{artifacts_root_directory}/secrets/credentials.json")
         print("Credentials saved locally successfully")
-        self.auth = auth
+        return AudibleAPI(auth)
 
     # Gets information about a book
     async def get_book_infos(self, asin):
@@ -112,8 +113,7 @@ class AudibleAPI:
                 li_books = [{"title": self.library["items"][int(book_selection)],
                              "asin":self.library["items"][int(book_selection)].get("asin", None)}]
             except (IndexError, ValueError):
-                print("Invalid selection")
-                await self.invalid_command_callback()
+                print("Invalid selection")                
         return li_books
 
     # Main download books function

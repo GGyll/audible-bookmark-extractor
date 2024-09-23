@@ -42,7 +42,7 @@ class Command:
         token = file.read()
         self.readwise_obj = Readwise(token)
     except FileNotFoundError:
-        print("\nNo Readwise Token found, please run 'readwise-authenticate' to generate them")
+        print("\nNo Readwise Token found, please run 'readwise_authenticate' to generate them")
         token = None
     
     print("Audible Bookmark Extractor v1.0")
@@ -71,12 +71,15 @@ class Command:
     # Takes the command supplied and sees if we have a function with the prefix cmd_ that we can execute with the given kwargs
     if command == "help":
       self.show_help()
+    elif command == "authenticate":
+        self.audible_obj = await AudibleAPI.authenticate()
+    elif command == "readwise_authenticate":
+        self.readwise_obj = await Readwise.authenticate()
     elif command == "quit" or command == "exit":
       return
     elif command.startswith("readwise"):
-        books = await self.audible_obj.get_book_selection()
         command = command.replace("readwise_", "")
-        await getattr(self.readwise_obj, f"cmd_{command}", self.invalid_command_callback)(books, **_kwargs)    
+        await getattr(self.readwise_obj, f"cmd_{command}", self.invalid_command_callback)(**_kwargs)    
     else:    
         await getattr(self.audible_obj, f"cmd_{command}", self.invalid_command_callback)(**_kwargs)
     
