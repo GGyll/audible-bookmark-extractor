@@ -11,7 +11,7 @@ pip install -r requirements.txt
 After everything is installed:
 
 ```
-python main_file.py
+python main.py
 ```
 
 Type help for a list of useful commands
