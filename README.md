@@ -1,6 +1,13 @@
-## This tool allows a user to download their audiobooks from Audible and transcribes their bookmarks into text, which can be exported to Notion and Excel (.csv)
+## This tool allows a user to download their audiobooks from Audible and transcribes their bookmarks into text, which can be exported
 
-main_file.py contains the CLI and most of the application logic
+Right now, this tool supports exporting to Excel and [Readwise] (https://readwise.io/)
+
+main.py is the main entry point and it mostly off-loads to command.py
+command.py is the command line processor
+audible_api.py is the audible api wrapper that handles authentication and downloads audiobooks from Audible
+transcribe_api.py is the Google Cloud Speech API wrapper that handles transcribing audiobooks into
+readwise_api.py is the Readwise API wrapper that handles exporting audiobooks to Readwise
+notion_api.py is the Notion API wrapper that handles exporting audiobooks to Notion (WIP)
 
 ### To start
 
@@ -20,6 +27,8 @@ Type help for a list of useful commands
 
 #### Note: you need 2FA activated on your Audible account
 
+#### For posting to Readwise: Go to https://readwise.io/access_token to get your access token. Copy and paste that into the command line when prompted.
+
 Run command
 
 ```
@@ -30,15 +39,25 @@ Then when prompted enter your email and password, a separate window will open to
 
 Then you are logged into the Audible API and your credentials are stored in credentials.json, you won't need to authenticate again as long as you have this file.
 
+```
+readwise_authenticate
+```
+If you are using this program to post your highlights from audible to readwise, authenticate with readwise first. Your credentials are stored in readwise_token.json and you won't need to authenticate again as long as you have this file.
+
+```
+readwise_post_highlights
+```
+All the highlights you have extracted and converted is stored in ~/audibleextractor/<<bookname>>/trascribed_clips/contents.json. After you run this command, go to https://readwise.io/books to see the highlights uploaded from this app.
+
 ### On top of ffmpeg-python, you need FFMPEG installed on your computer, refer to python-ffmpeg github doc
 
 https://github.com/kkroening/ffmpeg-python
 
 ### Anti-Piracy Notice
 
-Note that this project does NOT 'crack' Audible DRM or download audiobooks which the user does not own. It simply allows the user to use their own encryption key (fetched from Audible servers) to decrypt the audiobook in the same manner that the official audiobook playing software does, and download audiobooks which they have purchased.
+This project does not crack Audible DRM or facilitate the download of audiobooks that users do not rightfully own. Instead, it enables users to utilize their own encryption key (retrieved from Audible’s servers) to decrypt audiobooks in the same manner as Audible’s official software. This is limited to audiobooks that have been legally purchased by the user.
 
-Please only use this application for gaining full access to your own audiobooks for archiving/converson/convenience. DeDRMed audiobooks should not be uploaded to open servers, torrents, or other methods of mass distribution. No help will be given to people doing such things. Authors, retailers, and publishers all need to make a living, so that they can continue to produce audiobooks for us to hear, and enjoy. Don't be a parasite.
+Please ensure that this application is used solely for personal purposes such as archiving, conversion, or convenience with your own purchased content. Decrypted audiobooks must not be shared through public servers, torrents, or any other means of mass distribution. Assistance will not be provided to anyone engaging in such activities. Remember, authors, retailers, and publishers depend on fair compensation to continue producing the audiobooks we enjoy. Please respect their work and livelihood.
 
 This message is paraphrased from the https://apprenticealf.wordpress.com/ page.
 
