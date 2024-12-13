@@ -47,7 +47,9 @@ class AudibleAPI:
 
     @classmethod
     async def authenticate(self) -> "AudibleAPI":
-        if os.path.exists(f"{artifacts_root_directory}/secrets/credentials.json"):
+        secrets_dir_path = os.path.join(artifacts_root_directory, "secrets")
+        credentials_path = os.path.join(secrets_dir_path, "credentials.json")
+        if os.path.exists(credentials_path):
             print(f"You are already authenticated, to switch accounts, delete secrets directory under {artifacts_root_directory} and try again")
         email = input("Audible Email: ")
         password = getpass(
@@ -62,8 +64,8 @@ class AudibleAPI:
             with_username=False
         )
         
-        os.makedirs(f"{artifacts_root_directory}/secrets/", exist_ok=True)
-        auth.to_file(f"{artifacts_root_directory}/secrets/credentials.json")
+        os.makedirs(secrets_dir_path, exist_ok=True)
+        auth.to_file(credentials_path)
         print("Credentials saved locally successfully")
         return AudibleAPI(auth)
 
@@ -151,13 +153,15 @@ class AudibleAPI:
 
                 audible_response = requests.get(re, stream=True)
 
-                path_exists = os.path.exists(f"{artifacts_root_directory}/audiobooks/{title}/")
+                title_dir_path = os.path.join(artifacts_root_directory, "audiobooks", title)
+                path_exists = os.path.exists(title_dir_path)
                 if not path_exists:
-                    os.makedirs(f"{artifacts_root_directory}/audiobooks/{title}/")
+                    os.makedirs(title_dir_path)
                     
 
                 if audible_response.ok:
-                    with open(f'{artifacts_root_directory}/audiobooks/{title}/{title}.aax', 'wb') as f:
+                    title_file_path = os.path.join(title_dir_path, f"{title}.aax")
+                    with open(title_file_path, 'wb') as f:
                         print("Downloading %s" % raw_title)
 
                         total_length = audible_response.headers.get(
@@ -261,17 +265,23 @@ class AudibleAPI:
             li_clips = sorted(
                 li_bookmarks, key=lambda i: i["type"], reverse=True)
 
+            title_dir_path = os.path.join(artifacts_root_directory, "audiobooks", title)
+            title_aax_path = os.path.join(title_dir_path, f"{title}.aax")
+            title_m4b_path = os.path.join(title_dir_path, f"{title}.m4b")
+            title_mp3_path = os.path.join(title_dir_path, f"{title}.mp3")
+
             # Load audiobook into AudioSegment so we can slice it
             audio_book = AudioSegment.from_mp3(
-                f"{artifacts_root_directory}/audiobooks/{title}/{title}.mp3")
+                title_mp3_path)
 
             file_counter = 1
             notes_dict = {}
 
             # Check whether a folder in clips/ for the book exists or not
-            path_exists = os.path.exists(f"{artifacts_root_directory}/audiobooks/{title}/clips/")
+            clips_dir_path = os.path.join(artifacts_root_directory, "audiobooks", title, "clips")
+            path_exists = os.path.exists(clips_dir_path)
             if not path_exists:
-                os.makedirs(f"{artifacts_root_directory}/audiobooks/{title}/clips/")
+                os.makedirs(clips_dir_path)
 
             for audio_clip in li_clips:
                 # Get start position to slice
@@ -297,8 +307,9 @@ class AudibleAPI:
                         raw_start_pos, f"clip{file_counter}")
 
                     # Save the clip
+                    clip_path = os.path.join(clips_dir_path, f"{file_name}.flac")
                     clip.export(
-                        f"{artifacts_root_directory}/audiobooks/{title}/clips/{file_name}.flac", format="flac")
+                        clip_path, format="flac")
                     file_counter += 1
 
     async def cmd_convert_audiobook(self):
@@ -315,12 +326,16 @@ class AudibleAPI:
             title = _title.replace(" ", "_").lower()
             # Strips Audible DRM  from audiobook
             activation_bytes = self.get_activation_bytes()
+            title_dir_path = os.path.join(artifacts_root_directory, "audiobooks", title)
+            title_aax_path = os.path.join(title_dir_path, f"{title}.aax")
+            title_m4b_path = os.path.join(title_dir_path, f"{title}.m4b")
+            title_mp3_path = os.path.join(title_dir_path, f"{title}.mp3")
             os.system(
-                f"ffmpeg -activation_bytes {activation_bytes} -i {artifacts_root_directory}/audiobooks/{title}/{title}.aax -c copy {artifacts_root_directory}/audiobooks/{title}/{title}.m4b")
+                f"ffmpeg -activation_bytes {activation_bytes} -i {title_aax_path} -c copy {title_m4b_path}")
 
             # Converts audiobook to .mp3
             os.system(
-                f"ffmpeg -i {artifacts_root_directory}/audiobooks/{title}/{title}.m4b {artifacts_root_directory}/audiobooks/{title}/{title}.mp3")
+                f"ffmpeg -i {title_m4b_path} {title_mp3_path}")
 
     async def cmd_transcribe_bookmarks(self):
         li_books = await self.get_book_selection()
@@ -337,15 +352,18 @@ class AudibleAPI:
             _authors = book.get("title", {}).get("authors", {})
             allAuthors = ", ".join(item['name'] for item in _authors)
             title = _title.lower().replace(" ", "_")
-            directory = os.fsencode(f"{artifacts_root_directory}/audiobooks/{title}/clips/")
+            title_dir_path = os.path.join(artifacts_root_directory, "audiobooks", title)
+            clips_dir_path = os.path.join(title_dir_path, "clips")
+            directory = os.fsencode(clips_dir_path)
 
             path_exists = os.path.exists(directory)
             if not path_exists:
                 os.makedirs(directory)
 
-            trancribed_clips_path_exists = os.path.exists(f"{artifacts_root_directory}/audiobooks/{title}/trancribed_clips/")
+            transcribed_clips_dir_path = os.path.join(title_dir_path, "trancribed_clips")
+            trancribed_clips_path_exists = os.path.exists(transcribed_clips_dir_path)
             if not trancribed_clips_path_exists:
-                os.makedirs(f"{artifacts_root_directory}/audiobooks/{title}/trancribed_clips/")
+                os.makedirs(transcribed_clips_dir_path)
 
             for file in os.listdir(directory):
                 highlight = {}
@@ -380,8 +398,9 @@ class AudibleAPI:
                         jsonHighlights.append(highlight)
                     
                     # Create writer instance with desired path
+                    all_transcriptions_path = os.path.join(transcribed_clips_dir_path, "All_Transcriptions.xlsx")
                     writer = pd.ExcelWriter(
-                        f"{artifacts_root_directory}/audiobooks/{title}/trancribed_clips/All_Transcriptions.xlsx", engine='xlsxwriter')
+                        all_transcriptions_path, engine='xlsxwriter')
 
                     # Create a sheet in the same workbook for each file in the directory
                     sheet_name = title[:31].replace(":", "").replace("?", "")
@@ -414,22 +433,24 @@ class AudibleAPI:
                         worksheet.set_row(i, 100, cell_format)
 
                     # Apply changes and save xlsx to Transcribed bookmarks folder.
-                    writer.close()  
-            with open(f"{artifacts_root_directory}/audiobooks/{title}/trancribed_clips/contents.json", "w") as f:                
+                    writer.close()
+            transcription_contents_path = os.path.join(transcribed_clips_dir_path, "contents.json")
+            with open(transcription_contents_path, "w") as f:
                 json.dump(jsonHighlights, f, indent=4)                
 
     def get_activation_bytes(self):
 
+        activation_bytes_path = os.path.join(artifacts_root_directory, "secrets", "activation_bytes.txt")
         # we already have activation bytes
-        if os.path.exists(f"{artifacts_root_directory}secrets/activation_bytes.txt"):
-            with open(f'{artifacts_root_directory}/secrets/activation_bytes.txt') as f:
+        if os.path.exists(activation_bytes_path):
+            with open(activation_bytes_path) as f:
                 activation_bytes = f.readlines()[0]
 
         # we don't, so let's get them
         else:
             activation_bytes = self.auth.get_activation_bytes(
-                f"{artifacts_root_directory}/secrets/activation_bytes.txt", True)
-            text_file = open(f"{artifacts_root_directory}/secrets/activation_bytes.txt", "w")
+                activation_bytes_path, True)
+            text_file = open(activation_bytes_path, "w")
             n = text_file.write(activation_bytes)
             text_file.close()
 
