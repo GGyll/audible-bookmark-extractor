@@ -385,7 +385,7 @@ class AudibleAPI:
                     try:
                         text = r.recognize_google(audio)
                         pairs[str(heading)] = text
-                        highlight["text"] = r.recognize_google(audio)
+                        highlight["text"] = text
                     except Exception as e:
                         highlight["text"] = ""
                         print(f"Error while recognizing this clip {heading}: {e}")
