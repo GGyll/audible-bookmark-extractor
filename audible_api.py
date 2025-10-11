@@ -45,6 +45,13 @@ class AudibleAPI:
         self.books = []
         self.library = {}
 
+    def _format_time(self, seconds):
+        """Convert seconds to HH:MM:SS format"""
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        seconds = seconds % 60
+        return f"({hours}:{minutes:02d}:{seconds:02d})"
+
     @classmethod
     async def authenticate(self) -> "AudibleAPI":
         secrets_dir_path = os.path.join(artifacts_root_directory, "secrets")
@@ -242,13 +249,29 @@ class AudibleAPI:
         li_books = await self.get_book_selection()
 
         for book in li_books:
-            print(self.get_bookmarks(book))
+            bookmarks = self.get_bookmarks(book)
+            book_title = book.get('title', {}).get('title', 'Unknown Title') if isinstance(book.get('title'), dict) else book.get('title', 'Unknown Title')
+            if bookmarks:
+                print(f"\nBookmarks for: {book_title}")
+                for bookmark in bookmarks:
+                    position_str = f" at {bookmark['position_seconds']}s"
+                    bookmark_type = bookmark['type']
+                    bookmark_text = bookmark.get('text', '')
+
+                    if bookmark_type == 'audible.note':
+                        print(f"  Note{position_str}: {bookmark_text}")
+                    elif bookmark_type in ['audible.clip', 'audible.bookmark']:
+                        print(f"  Bookmark{position_str}")
+                        if bookmark_text:
+                            print(f"    Text: {bookmark_text}")
+            else:
+                print(f"No bookmarks found for: {book_title}")
 
     def get_bookmarks(self, book):
         asin = book.get("asin")
         _title = book.get("title", {}).get("title", 'untitled')
         if not _title:
-            return
+            return []
 
         title = _title.lower().replace(" ", "_")
 
@@ -276,6 +299,7 @@ class AudibleAPI:
 
             file_counter = 1
             notes_dict = {}
+            bookmarks_data = []
 
             # Check whether a folder in clips/ for the book exists or not
             clips_dir_path = os.path.join(artifacts_root_directory, "audiobooks", title, "clips")
@@ -286,12 +310,22 @@ class AudibleAPI:
             for audio_clip in li_clips:
                 # Get start position to slice
                 raw_start_pos = int(audio_clip["startPosition"])
+                position_seconds = raw_start_pos // 1000  # Convert milliseconds to seconds
+
+                bookmark_info = {
+                    "position_ms": raw_start_pos,
+                    "position_seconds": position_seconds,
+                    "type": audio_clip.get("type"),
+                    "text": audio_clip.get("text"),
+                    "end_position": audio_clip.get("endPosition")
+                }
+                bookmarks_data.append(bookmark_info)
 
                 # If we have a note then we save it so we can use it as the title for the bookmark text
                 if audio_clip.get("type", None) in ["audible.note"]:
                     notes_dict[raw_start_pos] = audio_clip.get("text")
                     print(
-                        f"CLIP: {notes_dict[raw_start_pos]}  {raw_start_pos}")
+                        f"CLIP: {notes_dict[raw_start_pos]}  {position_seconds}s")
 
                 if audio_clip.get("type", None) in ["audible.clip", "audible.bookmark"]:
                     start_pos = raw_start_pos - START_POSITION_OFFSET
@@ -306,11 +340,17 @@ class AudibleAPI:
                     file_name = notes_dict.get(
                         raw_start_pos, f"clip{file_counter}")
 
+                    # Include position in filename for transcription process
+                    position_suffix = f"_{position_seconds}s"
+                    full_file_name = f"{file_name}{position_suffix}"
+
                     # Save the clip
-                    clip_path = os.path.join(clips_dir_path, f"{file_name}.flac")
+                    clip_path = os.path.join(clips_dir_path, f"{full_file_name}.flac")
                     clip.export(
                         clip_path, format="flac")
                     file_counter += 1
+
+            return bookmarks_data
 
     async def cmd_convert_audiobook(self):
         # FFMPEG needs to be installed for this step! see readme for more details
@@ -370,8 +410,33 @@ class AudibleAPI:
                 filename = os.fsdecode(file)
                 highlight["title"] = _title
                 highlight["author"] = allAuthors
-                if not filename.startswith("clip"):
-                    highlight["note"] = filename.replace(".flac", "")
+
+                # Extract position from filename and set note field
+                base_filename = filename.replace(".flac", "")
+                if "_" in base_filename and base_filename.split("_")[-1].endswith("s"):
+                    # Remove position suffix for note field (e.g., "My Note_125s" -> "My Note")
+                    parts = base_filename.split("_")
+                    if len(parts) > 1 and parts[-1].endswith("s"):
+                        try:
+                            int(parts[-1].rstrip("s"))  # Validate it's a number
+                            highlight["note"] = "_".join(parts[:-1])  # Remove position suffix
+                        except ValueError:
+                            highlight["note"] = base_filename  # Keep original if position parsing fails
+                    else:
+                        highlight["note"] = base_filename
+                else:
+                    highlight["note"] = base_filename
+
+                # Extract the position suffix from any filename (e.g., "125s" from "note_125s.flac" or "clip1_125s.flac")
+                if "_" in filename and filename.endswith(".flac"):
+                    parts = filename.replace(".flac", "").split("_")
+                    if len(parts) > 1 and parts[-1].endswith("s"):
+                        try:
+                            position_seconds = int(parts[-1].rstrip("s"))
+                            highlight["position_seconds"] = position_seconds
+                        except ValueError:
+                            pass  # If position parsing fails, continue without it
+
                 highlight["source_type"] = "audible_bookmark_extractor"
                 if filename.endswith(".flac"):
                     print(os.path.join(os.fsdecode(directory), filename))
@@ -384,8 +449,11 @@ class AudibleAPI:
 
                     try:
                         text = r.recognize_google(audio)
-                        pairs[str(heading)] = text
-                        highlight["text"] = text
+                        # Prepend formatted time to the transcribed text
+                        formatted_time = self._format_time(highlight.get("position_seconds", 0))
+                        text_with_time = f"{formatted_time} {text}"
+                        pairs[str(heading)] = text_with_time
+                        highlight["text"] = text_with_time
                     except Exception as e:
                         highlight["text"] = ""
                         print(f"Error while recognizing this clip {heading}: {e}")
