@@ -56,4 +56,3 @@ xlsxwriter==3.1.2
 zerorpc==0.6.3
 zope.event==4.5.0
 zope.interface==5.4.0
-openai==1.54.0
