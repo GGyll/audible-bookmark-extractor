@@ -108,7 +108,7 @@ class AudibleAPI:
             "Enter the index number of the book you would like to download, or enter --all for all available books: \n")
 
         if book_selection == "--all":
-            li_books = [{"title": book, "asin": book["asin"]}
+            li_books = [{"title": book.get("title", 'untitled'), "asin": book["asin"]}
                         for book in self.library["items"]]
 
         else:
