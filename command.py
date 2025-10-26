@@ -45,7 +45,7 @@ class Command:
         token = file.read()
         self.readwise_obj = Readwise(token)
     except FileNotFoundError:
-        print("\nNo Readwise Token found, please run 'readwise_authenticate' to generate them")
+        print("\nNo Readwise Token found, please run 'readwise_authenticate' to generate them (if you would like to use Readwise for posting highlights)")
         token = None
     
     try:
@@ -53,7 +53,7 @@ class Command:
         api_key = file.read().strip()
         self.openai_obj = OpenAIConfig(api_key)
     except FileNotFoundError:
-        print("\nNo OpenAI API Key found, please run 'openai_authenticate' to add it")
+        print("\nNo OpenAI API Key found, please run 'openai_authenticate' to add it (if you would like to use OpenAI Whisper for transcribing the bookmarks)")
         api_key = None
     
     print("Audible Bookmark Extractor v1.0")
