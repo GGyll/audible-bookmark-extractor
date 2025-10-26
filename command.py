@@ -7,14 +7,14 @@ import audible
 
 help_dict = {
     "authenticate": "Logs in to Audible and stores credentials locally to be re-used",
-    "openai_authenticate": "Stores OpenAI API key locally to be used for transcription",
+    "openai_authenticate": "Stores OpenAI API key locally to use Whisper (optional)",
     "readwise_authenticate": "Logs in to Readwise and stores token locally",
     "readwise_post_highlights": "Posts selected highlights to Readwise",
     "list_books": "Lists the users books",
     "download_books": "Downloads books and saves them locally",
     "convert_audiobook": "Removes Audible DRM from the selected audiobooks and converts them to .mp3 so they can be sliced",
     "get_bookmarks": "WIP, extracts all timestamps for bookmarks in the selected audiobook",
-    "transcribe_bookmarks": "Self-explanatory, connects to OpenAI Whisper API and outputs the result",
+    "transcribe_bookmarks": "Transcribes bookmarks; uses OpenAI Whisper if configured, otherwise Google Speech Recognition (no API key required)",
     "quit/exit": "Exits this application"
 }
 
@@ -53,7 +53,7 @@ class Command:
         api_key = file.read().strip()
         self.openai_obj = OpenAIConfig(api_key)
     except FileNotFoundError:
-        print("\nNo OpenAI API Key found, please run 'openai_authenticate' to add it (if you would like to use OpenAI Whisper for transcribing the bookmarks)")
+        print("\nNo OpenAI API Key found, please run 'openai_authenticate' to add it (if you would like to use OpenAI Whisper for transcribing the bookmarks). Otherwise, we'll use Google Speech Recognition (no API key required)")
         api_key = None
     
     print("Audible Bookmark Extractor v1.0")

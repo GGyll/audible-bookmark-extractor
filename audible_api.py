@@ -348,7 +348,7 @@ class AudibleAPI:
             print("Using OpenAI Whisper API for transcription")
         else:
             r = sr.Recognizer()
-            print("Using Google Speech Recognition for transcription (OpenAI key not found)")
+            print("Using Google Speech Recognition for transcription (no API key required)")
 
         # Create dictionary to store titles and transcriptions and new folder to store transcriptions
         pairs = {}
