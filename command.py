@@ -1,28 +1,31 @@
 from audible_api import AudibleAPI
 from constants import artifacts_root_directory
 from readwise import Readwise
+from openai_config import OpenAIConfig
 from typing import Optional
 import audible
 
 help_dict = {
     "authenticate": "Logs in to Audible and stores credentials locally to be re-used",
+    "openai_authenticate": "Stores OpenAI API key locally to use Whisper (optional)",
     "readwise_authenticate": "Logs in to Readwise and stores token locally",
     "readwise_post_highlights": "Posts selected highlights to Readwise",
     "list_books": "Lists the users books",
     "download_books": "Downloads books and saves them locally",
     "convert_audiobook": "Removes Audible DRM from the selected audiobooks and converts them to .mp3 so they can be sliced",
     "get_bookmarks": "WIP, extracts all timestamps for bookmarks in the selected audiobook",
-    "transcribe_bookmarks": "Self-explanatory, connects to Speech Recognition API and outputs the result",
+    "transcribe_bookmarks": "Transcribes bookmarks; uses OpenAI Whisper if configured, otherwise Google Speech Recognition (no API key required)",
     "quit/exit": "Exits this application"
 }
 
-AUTHLESS_COMMANDS = ["help", "quit", "exit", "authenticate", "readwise_authenticate"]
+AUTHLESS_COMMANDS = ["help", "quit", "exit", "authenticate", "readwise_authenticate", "openai_authenticate"]
 
 class Command:
         
   def __init__(self):
       self.audible_obj: Optional[AudibleAPI] = None
-      self.readwise_obj: Optional[Readwise] = None  
+      self.readwise_obj: Optional[Readwise] = None
+      self.openai_obj: Optional[OpenAIConfig] = None  
   
   def show_help(self):
       for key in help_dict:
@@ -42,8 +45,16 @@ class Command:
         token = file.read()
         self.readwise_obj = Readwise(token)
     except FileNotFoundError:
-        print("\nNo Readwise Token found, please run 'readwise_authenticate' to generate them")
+        print("\nNo Readwise Token found, please run 'readwise_authenticate' to generate them (if you would like to use Readwise for posting highlights)")
         token = None
+    
+    try:
+      with open(f"{artifacts_root_directory}/secrets/openai_key.json", "r") as file:
+        api_key = file.read().strip()
+        self.openai_obj = OpenAIConfig(api_key)
+    except FileNotFoundError:
+        print("\nNo OpenAI API Key found, please run 'openai_authenticate' to add it (if you would like to use OpenAI Whisper for transcribing the bookmarks). Otherwise, we'll use Google Speech Recognition (no API key required)")
+        api_key = None
     
     print("Audible Bookmark Extractor v1.0")
     print("To download your audiobooks, ensure you are authenticated, then enter download_books")
@@ -75,6 +86,8 @@ class Command:
         self.audible_obj = await AudibleAPI.authenticate()
     elif command == "readwise_authenticate":
         self.readwise_obj = await Readwise.authenticate()
+    elif command == "openai_authenticate":
+        self.openai_obj = await OpenAIConfig.authenticate()
     elif command == "quit" or command == "exit":
       return
     elif command.startswith("readwise"):
@@ -82,7 +95,12 @@ class Command:
         command = command.replace("readwise_", "")
         await getattr(self.readwise_obj, f"cmd_{command}", self.invalid_command_callback)(books, **_kwargs)    
     else:    
-        await getattr(self.audible_obj, f"cmd_{command}", self.invalid_command_callback)(**_kwargs)
+        # Pass openai_obj to methods that might need it
+        method = getattr(self.audible_obj, f"cmd_{command}", self.invalid_command_callback)
+        if command == "transcribe_bookmarks" and self.openai_obj:
+            await method(openai_api_key=self.openai_obj.api_key, **_kwargs)
+        else:
+            await method(**_kwargs)
     
     await self.command_loop()
   

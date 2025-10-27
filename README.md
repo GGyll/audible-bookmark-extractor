@@ -68,6 +68,11 @@ readwise_post_highlights
 
 Once posted, you can visit [Readwise Books](https://readwise.io/books) to see the highlights uploaded from this app.
 
+## Transcription
+
+- OpenAI Whisper (optional): Provide an API key via `openai_authenticate` to use Whisper-based transcription.
+- Google Speech Recognition (default fallback): If no OpenAI key is provided, the app uses the SpeechRecognition library’s Google recognizer; no API key required.
+
 ## FFMPEG Setup
 
 In addition to `ffmpeg-python`, you need to install FFMPEG on your system. For installation details, refer to the [python-ffmpeg documentation](https://github.com/kkroening/ffmpeg-python).
