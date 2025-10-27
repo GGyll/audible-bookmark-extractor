@@ -12,6 +12,7 @@ import audible
 from pydub import AudioSegment
 
 import speech_recognition as sr
+from openai import OpenAI
 
 from errors import ExternalError
 from constants import artifacts_root_directory
@@ -337,10 +338,17 @@ class AudibleAPI:
             os.system(
                 f"ffmpeg -i {title_m4b_path} {title_mp3_path}")
 
-    async def cmd_transcribe_bookmarks(self):
+    async def cmd_transcribe_bookmarks(self, openai_api_key=None):
         li_books = await self.get_book_selection()
 
-        r = sr.Recognizer()
+        # Initialize OpenAI client if API key is provided, otherwise fall back to Google
+        use_openai = openai_api_key is not None
+        if use_openai:
+            client = OpenAI(api_key=openai_api_key)
+            print("Using OpenAI Whisper API for transcription")
+        else:
+            r = sr.Recognizer()
+            print("Using Google Speech Recognition for transcription (no API key required)")
 
         # Create dictionary to store titles and transcriptions and new folder to store transcriptions
         pairs = {}
@@ -377,18 +385,30 @@ class AudibleAPI:
                     print(os.path.join(os.fsdecode(directory), filename))
                     heading = filename.replace(".flac", "")
 
-                    audioclip = sr.AudioFile(os.path.join(
-                        os.fsdecode(directory), filename))
-                    with audioclip as source:
-                        audio = r.record(source)
-
                     try:
-                        text = r.recognize_google(audio)
+                        if use_openai:
+                            # Use OpenAI Whisper API
+                            audio_file_path = os.path.join(os.fsdecode(directory), filename)
+                            with open(audio_file_path, "rb") as audio_file:
+                                transcription = client.audio.transcriptions.create(
+                                    model="gpt-4o-transcribe",
+                                    file=audio_file
+                                )
+                                text = transcription.text
+                        else:
+                            # Use Google Speech Recognition
+                            audioclip = sr.AudioFile(os.path.join(
+                                os.fsdecode(directory), filename))
+                            with audioclip as source:
+                                audio = r.record(source)
+                            text = r.recognize_google(audio)
+                        
                         pairs[str(heading)] = text
                         highlight["text"] = text
                     except Exception as e:
                         highlight["text"] = ""
                         print(f"Error while recognizing this clip {heading}: {e}")
+                    
                     xcel = pd.DataFrame(pairs.values(), index=pairs.keys())
 
                     # Change header format so that rows can be edited

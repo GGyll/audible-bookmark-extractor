@@ -58,7 +58,7 @@ Your credentials will be stored in `readwise_token.json`, and you won't need to 
 ### Posting Highlights to Readwise:
 Once you've extracted and converted highlights, they are stored in:
 ```
-~/audibleextractor/<<bookname>>/transcribed_clips/contents.json
+~/audible-bookmark-extractor/<<bookname>>/transcribed_clips/contents.json
 ```
 
 Run the following command to post your highlights:
@@ -67,6 +67,11 @@ readwise_post_highlights
 ```
 
 Once posted, you can visit [Readwise Books](https://readwise.io/books) to see the highlights uploaded from this app.
+
+## Transcription
+
+- OpenAI Whisper (optional): Provide an API key via `openai_authenticate` to use Whisper-based transcription.
+- Google Speech Recognition (default fallback): If no OpenAI key is provided, the app uses the SpeechRecognition library’s Google recognizer; no API key required.
 
 ## FFMPEG Setup
 

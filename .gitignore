@@ -329,3 +329,4 @@ cython_debug/
 
 # VSCode
 .vscode/
+secrets/
