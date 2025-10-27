@@ -58,7 +58,7 @@ Your credentials will be stored in `readwise_token.json`, and you won't need to 
 ### Posting Highlights to Readwise:
 Once you've extracted and converted highlights, they are stored in:
 ```
-~/audibleextractor/<<bookname>>/transcribed_clips/contents.json
+~/audible-bookmark-extractor/<<bookname>>/transcribed_clips/contents.json
 ```
 
 Run the following command to post your highlights:
