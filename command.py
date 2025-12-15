@@ -15,6 +15,7 @@ help_dict = {
     "convert_audiobook": "Removes Audible DRM from the selected audiobooks and converts them to .mp3 so they can be sliced",
     "get_bookmarks": "WIP, extracts all timestamps for bookmarks in the selected audiobook",
     "transcribe_bookmarks": "Transcribes bookmarks; uses OpenAI Whisper if configured, otherwise Google Speech Recognition (no API key required)",
+    "process_book": "Runs the full pipeline (download, convert, get bookmarks, transcribe) for a single book. Auto-skips completed steps. Usage: process_book --index=<book_number> [--skip-download=true] [--skip-convert=true] [--skip-bookmarks=true] [--skip-transcribe=true]",
     "quit/exit": "Exits this application"
 }
 
@@ -57,8 +58,9 @@ class Command:
         api_key = None
     
     print("Audible Bookmark Extractor v1.0")
-    print("To download your audiobooks, ensure you are authenticated, then enter download_books")
-    print("Enter help for a list of commands")
+    print("Quick Start: Run 'list_books' to see your library, then 'process_book --index=<number>' to process a book")
+    print("Or use individual commands: download_books, convert_audiobook, get_bookmarks, transcribe_bookmarks")
+    print("Enter 'help' for a full list of commands")
     
   async def command_loop(self):
     command_input = input("\n\nEnter command: ")

@@ -8,6 +8,7 @@ from getpass import getpass
 import pandas as pd
 import pandas.io.formats.excel
 import audible
+import httpx
 
 from pydub import AudioSegment
 
@@ -38,6 +39,11 @@ AUDIBLE_URL_BASE = "https://www.audible"
 # Feel free to vary these, but free Speech Recognition API's have certain limits...
 START_POSITION_OFFSET = 10000
 END_POSITION_OFFSET = 0
+
+# Configuration for transcription output location
+# Change this path to customize where transcriptions are saved
+# Default: Desktop/Audible Transcriptions
+TRANSCRIPTION_OUTPUT_PATH = os.path.join(os.path.expanduser("~"), "Desktop", "Audible Transcriptions")
 
 class AudibleAPI:
 
@@ -72,8 +78,10 @@ class AudibleAPI:
 
     # Gets information about a book
     async def get_book_infos(self, asin):
-        async with audible.AsyncClient(self.auth) as client:
-            try:                
+        # Configure a longer timeout (60 seconds) for API requests
+        timeout = httpx.Timeout(60.0, connect=10.0)
+        async with audible.AsyncClient(self.auth, timeout=timeout) as client:
+            try:
                 book = await client.get(
                     path=f"library/{asin}",
                     params={
@@ -208,14 +216,13 @@ class AudibleAPI:
             return library.url
 
     async def cmd_list_books(self):
-        if not self.books:
-            await self.cmd_show_library()
-
         await self.cmd_show_library()
         
     # Gets all books and info for account and adds it to self.books, also returns ASIN for all books
     async def get_library(self):
-        async with audible.AsyncClient(self.auth) as client:
+        # Configure a longer timeout (60 seconds) for large library requests
+        timeout = httpx.Timeout(60.0, connect=10.0)
+        async with audible.AsyncClient(self.auth, timeout=timeout) as client:
             self.library = await client.get(
                 path="library",
                 params={
@@ -368,10 +375,13 @@ class AudibleAPI:
             if not path_exists:
                 os.makedirs(directory)
 
-            transcribed_clips_dir_path = os.path.join(title_dir_path, "trancribed_clips")
+            # Save transcriptions to Desktop
+            desktop_path = os.path.join(TRANSCRIPTION_OUTPUT_PATH, _title)
+            transcribed_clips_dir_path = desktop_path
             trancribed_clips_path_exists = os.path.exists(transcribed_clips_dir_path)
             if not trancribed_clips_path_exists:
                 os.makedirs(transcribed_clips_dir_path)
+                print(f"Saving transcriptions to: {transcribed_clips_dir_path}")
 
             for file in os.listdir(directory):
                 highlight = {}
@@ -454,9 +464,25 @@ class AudibleAPI:
 
                     # Apply changes and save xlsx to Transcribed bookmarks folder.
                     writer.close()
+
+            # Save JSON
             transcription_contents_path = os.path.join(transcribed_clips_dir_path, "contents.json")
             with open(transcription_contents_path, "w") as f:
-                json.dump(jsonHighlights, f, indent=4)                
+                json.dump(jsonHighlights, f, indent=4)
+
+            # Save Markdown
+            markdown_path = os.path.join(transcribed_clips_dir_path, f"Bookmarks - {_title}.md")
+            with open(markdown_path, "w") as f:
+                # Write header
+                f.write(f"# {_title}\n")
+                f.write(f"By {allAuthors}\n\n")
+
+                # Write each highlight as a paragraph
+                for highlight in jsonHighlights:
+                    if highlight.get("text"):
+                        f.write(f"{highlight['text']}\n\n")
+
+            print(f"Saved markdown to: {markdown_path}")                
 
     def get_activation_bytes(self):
 
@@ -478,3 +504,326 @@ class AudibleAPI:
 
     def bookmark_response_callback(self, resp):
         return resp
+
+    async def cmd_process_book(self, index=None, skip_download=None, skip_convert=None, skip_bookmarks=None, skip_transcribe=None):
+        """
+        Runs the full pipeline for a single book: download, convert, get bookmarks, and transcribe.
+        Requires --index parameter with the book number from list_books.
+
+        Optional flags to skip steps:
+        --skip-download=true: Skip download step
+        --skip-convert=true: Skip conversion step
+        --skip-bookmarks=true: Skip bookmark extraction step
+        --skip-transcribe=true: Skip transcription step
+
+        By default, steps are automatically skipped if their output files already exist.
+        """
+        if index is None:
+            print("Error: --index parameter is required. Usage: process_book --index=<book_number>")
+            print("Run 'list_books' first to see available books and their index numbers.")
+            return
+
+        # Get library if not already loaded
+        if not self.library:
+            await self.get_library()
+
+        # Validate index
+        try:
+            book_index = int(index)
+            if book_index < 0 or book_index >= len(self.library["items"]):
+                print(f"Error: Invalid index {book_index}. Please choose a number between 0 and {len(self.library['items'])-1}")
+                return
+        except ValueError:
+            print(f"Error: Invalid index '{index}'. Please provide a numeric index.")
+            return
+
+        # Get the book at the specified index
+        book_item = self.library["items"][book_index]
+        # Structure matches what get_bookmarks and other methods expect
+        book = {
+            "title": book_item,  # Pass the entire book item as 'title' (legacy structure)
+            "asin": book_item.get("asin")
+        }
+
+        # Prepare file paths for checking
+        title = book_item.get("title", "untitled").lower().replace(" ", "_")
+        title_dir_path = os.path.join(artifacts_root_directory, "audiobooks", title)
+        title_aax_path = os.path.join(title_dir_path, f"{title}.aax")
+        title_mp3_path = os.path.join(title_dir_path, f"{title}.mp3")
+        clips_dir_path = os.path.join(title_dir_path, "clips")
+        # Transcriptions saved to Desktop
+        desktop_transcriptions_path = os.path.join(TRANSCRIPTION_OUTPUT_PATH, book_item.get("title", "untitled"))
+        transcription_contents_path = os.path.join(desktop_transcriptions_path, "contents.json")
+
+        # Convert flag strings to boolean
+        skip_download = skip_download in ["true", "True", "1", "yes"]
+        skip_convert = skip_convert in ["true", "True", "1", "yes"]
+        skip_bookmarks = skip_bookmarks in ["true", "True", "1", "yes"]
+        skip_transcribe = skip_transcribe in ["true", "True", "1", "yes"]
+
+        print(f"\n{'='*60}")
+        print(f"Processing book: {book_item.get('title', 'untitled')}")
+        print(f"{'='*60}\n")
+
+        # Step 1: Download the book
+        print("\n[Step 1/4] Downloading book...")
+        print("-" * 60)
+        if skip_download:
+            print("⊘ Skipped (manual flag)")
+        elif os.path.exists(title_aax_path):
+            print(f"✓ Already downloaded: {title_aax_path}")
+            print("⊘ Skipping download (file exists)")
+        else:
+            await self._download_single_book(book)
+
+        # Step 2: Convert audiobook
+        print("\n[Step 2/4] Converting audiobook to MP3...")
+        print("-" * 60)
+        if skip_convert:
+            print("⊘ Skipped (manual flag)")
+        elif os.path.exists(title_mp3_path):
+            print(f"✓ Already converted: {title_mp3_path}")
+            print("⊘ Skipping conversion (file exists)")
+        else:
+            await self._convert_single_book(book)
+
+        # Step 3: Get bookmarks
+        print("\n[Step 3/4] Extracting bookmarks...")
+        print("-" * 60)
+        if skip_bookmarks:
+            print("⊘ Skipped (manual flag)")
+        elif os.path.exists(clips_dir_path) and os.listdir(clips_dir_path):
+            clip_count = len([f for f in os.listdir(clips_dir_path) if f.endswith('.flac')])
+            print(f"✓ Bookmarks already extracted: {clip_count} clips found")
+            print("⊘ Skipping bookmark extraction (clips exist)")
+        else:
+            self.get_bookmarks(book)
+
+        # Step 4: Transcribe bookmarks
+        print("\n[Step 4/4] Transcribing bookmarks...")
+        print("-" * 60)
+        if skip_transcribe:
+            print("⊘ Skipped (manual flag)")
+        elif os.path.exists(transcription_contents_path):
+            print(f"✓ Already transcribed: {transcription_contents_path}")
+            print("⊘ Skipping transcription (file exists)")
+        else:
+            # Check if OpenAI is configured
+            openai_key = None
+            try:
+                with open(f"{artifacts_root_directory}/secrets/openai_key.json", "r") as file:
+                    openai_key = file.read().strip()
+            except FileNotFoundError:
+                pass
+
+            await self._transcribe_single_book(book, openai_key)
+
+        print(f"\n{'='*60}")
+        print(f"✓ Successfully processed: {book_item.get('title', 'untitled')}")
+        print(f"{'='*60}\n")
+
+    async def _download_single_book(self, book):
+        """Helper method to download a single book without user selection."""
+        try:
+            book_info = await self.get_book_infos(book.get("asin"))
+            if book_info is None:
+                print(f"Error: Could not retrieve book information")
+                return
+
+            asin = book_info["item"]["asin"]
+            raw_title = book_info["item"]["title"]
+            title = raw_title.lower().replace(" ", "_")
+
+            print(f"Downloading: {raw_title}")
+
+            try:
+                re = self.get_download_url(
+                    self.generate_url(self.auth.locale.country_code, "download", asin),
+                    num_results=1000,
+                    response_groups="product_desc, product_attrs"
+                )
+            except audible.exceptions.NetworkError as e:
+                ExternalError(self.get_download_url, asin, e).show_error()
+                return
+
+            audible_response = requests.get(re, stream=True)
+
+            title_dir_path = os.path.join(artifacts_root_directory, "audiobooks", title)
+            if not os.path.exists(title_dir_path):
+                os.makedirs(title_dir_path)
+
+            if audible_response.ok:
+                title_file_path = os.path.join(title_dir_path, f"{title}.aax")
+                with open(title_file_path, 'wb') as f:
+                    total_length = audible_response.headers.get('content-length')
+
+                    if total_length is None:
+                        print("Unable to estimate download size, downloading...")
+                        f.write(audible_response.content)
+                    else:
+                        dl = 0
+                        total_length = int(total_length)
+                        for data in audible_response.iter_content(chunk_size=1024*1024):
+                            dl += len(data)
+                            f.write(data)
+                            done = int(50 * dl / total_length)
+                            sys.stdout.write("\r[%s%s]" % ('=' * done, ' ' * (50-done)))
+                            sys.stdout.write(f"   {int(dl / total_length * 100)}%")
+                            sys.stdout.flush()
+                        print()  # New line after progress bar
+            else:
+                print(f"Error downloading: {audible_response.text}")
+
+        except Exception as e:
+            print(f"Error downloading book: {e}")
+
+    async def _convert_single_book(self, book):
+        """Helper method to convert a single book without user selection."""
+        try:
+            # Extract title from nested structure
+            _title = book.get("title", {}).get("title", "untitled")
+            title = _title.replace(" ", "_").lower()
+
+            activation_bytes = self.get_activation_bytes()
+            title_dir_path = os.path.join(artifacts_root_directory, "audiobooks", title)
+            title_aax_path = os.path.join(title_dir_path, f"{title}.aax")
+            title_m4b_path = os.path.join(title_dir_path, f"{title}.m4b")
+            title_mp3_path = os.path.join(title_dir_path, f"{title}.mp3")
+
+            print(f"Converting {_title} to M4B...")
+            os.system(f"ffmpeg -activation_bytes {activation_bytes} -i {title_aax_path} -c copy {title_m4b_path}")
+
+            print(f"Converting {_title} to MP3...")
+            os.system(f"ffmpeg -i {title_m4b_path} {title_mp3_path}")
+
+        except Exception as e:
+            print(f"Error converting book: {e}")
+
+    async def _transcribe_single_book(self, book, openai_api_key=None):
+        """Helper method to transcribe bookmarks for a single book without user selection."""
+        try:
+            use_openai = openai_api_key is not None
+            if use_openai:
+                client = OpenAI(api_key=openai_api_key)
+                print("Using OpenAI Whisper API for transcription")
+            else:
+                r = sr.Recognizer()
+                print("Using Google Speech Recognition for transcription")
+
+            pairs = {}
+            jsonHighlights = []
+
+            # Extract title and authors from nested structure
+            _title = book.get("title", {}).get("title", "untitled")
+            _authors = book.get("title", {}).get("authors", [])
+            allAuthors = ", ".join(item['name'] for item in _authors) if _authors else ""
+
+            title = _title.lower().replace(" ", "_")
+            title_dir_path = os.path.join(artifacts_root_directory, "audiobooks", title)
+            clips_dir_path = os.path.join(title_dir_path, "clips")
+            directory = os.fsencode(clips_dir_path)
+
+            if not os.path.exists(directory):
+                print(f"No clips directory found at {clips_dir_path}")
+                return
+
+            # Save transcriptions to Desktop
+            desktop_path = os.path.join(TRANSCRIPTION_OUTPUT_PATH, _title)
+            transcribed_clips_dir_path = desktop_path
+            if not os.path.exists(transcribed_clips_dir_path):
+                os.makedirs(transcribed_clips_dir_path)
+                print(f"Saving transcriptions to: {transcribed_clips_dir_path}")
+
+            for file in os.listdir(directory):
+                highlight = {}
+                filename = os.fsdecode(file)
+                highlight["title"] = _title
+                highlight["author"] = allAuthors
+                if not filename.startswith("clip"):
+                    highlight["note"] = filename.replace(".flac", "")
+                highlight["source_type"] = "audible_bookmark_extractor"
+
+                if filename.endswith(".flac"):
+                    print(f"Transcribing: {filename}")
+                    heading = filename.replace(".flac", "")
+
+                    try:
+                        if use_openai:
+                            audio_file_path = os.path.join(os.fsdecode(directory), filename)
+                            with open(audio_file_path, "rb") as audio_file:
+                                transcription = client.audio.transcriptions.create(
+                                    model="gpt-4o-transcribe",
+                                    file=audio_file
+                                )
+                                text = transcription.text
+                        else:
+                            audioclip = sr.AudioFile(os.path.join(os.fsdecode(directory), filename))
+                            with audioclip as source:
+                                audio = r.record(source)
+                            text = r.recognize_google(audio)
+
+                        pairs[str(heading)] = text
+                        highlight["text"] = text
+                    except Exception as e:
+                        highlight["text"] = ""
+                        print(f"Error transcribing {heading}: {e}")
+
+                    xcel = pd.DataFrame(pairs.values(), index=pairs.keys())
+                    pandas.io.formats.excel.ExcelFormatter.header_style = None
+
+                    if highlight["text"]:
+                        jsonHighlights.append(highlight)
+
+                    all_transcriptions_path = os.path.join(transcribed_clips_dir_path, "All_Transcriptions.xlsx")
+                    writer = pd.ExcelWriter(all_transcriptions_path, engine='xlsxwriter')
+
+                    sheet_name = title[:31].replace(":", "").replace("?", "")
+                    xcel.to_excel(writer, sheet_name=sheet_name)
+                    workbook = writer.book
+                    worksheet = writer.sheets[sheet_name]
+
+                    header_format = workbook.add_format({
+                        "valign": "vcenter",
+                        "align": "center",
+                        "bg_color": "#FFA500",
+                        "bold": True,
+                        "font_color": "#FFFFFF"
+                    })
+
+                    cell_format = workbook.add_format()
+                    cell_format.set_align("vcenter")
+                    cell_format.set_align("center")
+                    cell_format.set_text_wrap(True)
+
+                    worksheet.write(0, 0, 'Clip Note', header_format)
+                    worksheet.write(0, 1, 'Transcription', header_format)
+                    worksheet.set_column("B:B", 100)
+                    worksheet.set_column("A:A", 50)
+
+                    for i in range(1, (len(xcel)+1)):
+                        worksheet.set_row(i, 100, cell_format)
+
+                    writer.close()
+
+            # Save JSON
+            transcription_contents_path = os.path.join(transcribed_clips_dir_path, "contents.json")
+            with open(transcription_contents_path, "w") as f:
+                json.dump(jsonHighlights, f, indent=4)
+
+            # Save Markdown
+            markdown_path = os.path.join(transcribed_clips_dir_path, f"Bookmarks - {_title}.md")
+            with open(markdown_path, "w") as f:
+                # Write header
+                f.write(f"# {_title}\n")
+                f.write(f"By {allAuthors}\n\n")
+
+                # Write each highlight as a paragraph
+                for highlight in jsonHighlights:
+                    if highlight.get("text"):
+                        f.write(f"{highlight['text']}\n\n")
+
+            print(f"Transcribed {len(pairs)} clips")
+            print(f"Saved markdown to: {markdown_path}")
+
+        except Exception as e:
+            print(f"Error transcribing bookmarks: {e}")
