@@ -8,6 +8,7 @@ from getpass import getpass
 import pandas as pd
 import pandas.io.formats.excel
 import audible
+import httpx
 
 from pydub import AudioSegment
 
@@ -72,8 +73,10 @@ class AudibleAPI:
 
     # Gets information about a book
     async def get_book_infos(self, asin):
-        async with audible.AsyncClient(self.auth) as client:
-            try:                
+        # Configure a longer timeout (60 seconds) for API requests
+        timeout = httpx.Timeout(60.0, connect=10.0)
+        async with audible.AsyncClient(self.auth, timeout=timeout) as client:
+            try:
                 book = await client.get(
                     path=f"library/{asin}",
                     params={
@@ -215,7 +218,9 @@ class AudibleAPI:
         
     # Gets all books and info for account and adds it to self.books, also returns ASIN for all books
     async def get_library(self):
-        async with audible.AsyncClient(self.auth) as client:
+        # Configure a longer timeout (60 seconds) for large library requests
+        timeout = httpx.Timeout(60.0, connect=10.0)
+        async with audible.AsyncClient(self.auth, timeout=timeout) as client:
             self.library = await client.get(
                 path="library",
                 params={
