@@ -216,9 +216,6 @@ class AudibleAPI:
             return library.url
 
     async def cmd_list_books(self):
-        if not self.books:
-            await self.cmd_show_library()
-
         await self.cmd_show_library()
         
     # Gets all books and info for account and adds it to self.books, also returns ASIN for all books
