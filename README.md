@@ -68,6 +68,67 @@ readwise_post_highlights
 
 Once posted, you can visit [Readwise Books](https://readwise.io/books) to see the highlights uploaded from this app.
 
+## Processing Books
+
+### Quick Start: Full Pipeline Command
+
+The easiest way to process a book is using the `process_book` command, which runs all four steps automatically:
+
+1. First, list your books to see their index numbers:
+   ```
+   list_books
+   ```
+
+2. Then run the full pipeline for a specific book:
+   ```
+   process_book --index=3
+   ```
+   (Replace `3` with the index number of your book)
+
+This single command will:
+- Download the audiobook
+- Convert it to MP3 (removing DRM)
+- Extract all bookmarks
+- Transcribe the bookmarks
+
+The command will show progress for each step and handle errors gracefully.
+
+**Smart Resume:** The pipeline automatically detects and skips completed steps. If it crashes or you interrupt it, just run the same command again and it will resume where it left off.
+
+**Manual Step Control:** You can also skip specific steps manually:
+```
+process_book --index=3 --skip-download=true              # Skip download only
+process_book --index=3 --skip-download=true --skip-convert=true   # Start from bookmarks
+```
+
+Available skip flags: `--skip-download`, `--skip-convert`, `--skip-bookmarks`, `--skip-transcribe`
+
+### Manual Step-by-Step Process
+
+If you prefer to run each step individually, you can use these commands in order:
+
+1. **Download books:**
+   ```
+   download_books
+   ```
+
+2. **Convert audiobook to MP3:**
+   ```
+   convert_audiobook
+   ```
+
+3. **Extract bookmarks:**
+   ```
+   get_bookmarks
+   ```
+
+4. **Transcribe bookmarks:**
+   ```
+   transcribe_bookmarks
+   ```
+
+Each command will prompt you to select a book from your library.
+
 ## Transcription
 
 - OpenAI Whisper (optional): Provide an API key via `openai_authenticate` to use Whisper-based transcription.
